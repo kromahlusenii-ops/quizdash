@@ -82,7 +82,9 @@ export class SessionManager {
 
   joinPlayer(sessionId: string, displayName: string): PlayerState {
     const session = this.requireSession(sessionId);
-    this.requireStatus(session, 'lobby');
+    if (session.status !== 'lobby' && session.status !== 'running') {
+      throw new Error('INVALID_STATE');
+    }
 
     const alivePlayers = Array.from(session.players.values()).filter(
       p => p.status !== 'disconnected'

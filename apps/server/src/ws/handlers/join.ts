@@ -22,7 +22,7 @@ export function handleJoin(
       return;
     }
 
-    if (session.status !== 'lobby') {
+    if (session.status !== 'lobby' && session.status !== 'running') {
       sendToWs(ws, { type: 'error', code: 'INVALID_STATE', message: 'Game has already started' });
       return;
     }

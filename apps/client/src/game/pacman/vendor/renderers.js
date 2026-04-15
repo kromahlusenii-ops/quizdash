@@ -105,10 +105,9 @@ var initRenderer = function(canvasEl){
         center();
     };
 
-    // center the canvas in the container
+    // center the canvas in the container (parent flex handles positioning)
     var center = function() {
         canvas.style.display = "block";
-        canvas.style.margin = "0 auto";
     };
 
     // use provided canvas element

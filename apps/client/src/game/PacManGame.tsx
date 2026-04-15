@@ -2,12 +2,13 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useSessionPolling } from '../ws/useSessionPolling';
 import { createPacManGame, type PacManController } from './pacman/pacmanEngine';
 import LobbyOverlay from './overlays/LobbyOverlay';
+import CountdownOverlay from './overlays/CountdownOverlay';
 import CheckpointOverlay from './overlays/CheckpointOverlay';
 import LeaderboardOverlay from './overlays/LeaderboardOverlay';
 import SpectatorOverlay from './overlays/SpectatorOverlay';
 import type { LeaderboardEntry } from '@financegame/shared';
 
-type GamePhase = 'lobby' | 'playing' | 'checkpoint' | 'spectator' | 'leaderboard';
+type GamePhase = 'lobby' | 'countdown' | 'playing' | 'checkpoint' | 'spectator' | 'leaderboard';
 
 interface PacManGameProps {
   role: 'student' | 'instructor';
@@ -52,7 +53,6 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
       const controller = await createPacManGame(canvasRef.current, {
         onGameOver: () => {
           // Pac-Man game over (all lives lost in-game)
-          // This is separate from checkpoint elimination
         },
       });
       controllerRef.current = controller;
@@ -70,7 +70,6 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
         initGame();
 
         if (status === 'checkpoint_active' && state.checkpoint) {
-          // Arrived during active checkpoint
           setCheckpointData({
             checkpointIndex: state.checkpoint.checkpointIndex,
             question: state.checkpoint.question,
@@ -91,7 +90,7 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
     const unsubscribe = onMessage((msg: any) => {
       switch (msg.type) {
         case 'game_launched':
-          setPhase('playing');
+          setPhase('countdown');
           initGame();
           break;
 
@@ -127,6 +126,11 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
     return unsubscribe;
   }, [onMessage, initGame]);
 
+  // Handle countdown complete
+  const handleCountdownComplete = useCallback(() => {
+    setPhase('playing');
+  }, []);
+
   // Handle checkpoint completion
   const handleCheckpointComplete = useCallback(
     (wasCorrect: boolean, eliminated: boolean) => {
@@ -158,11 +162,16 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
     };
   }, []);
 
+  const showCanvas = phase !== 'lobby' && phase !== 'leaderboard';
+
   return (
     <div
       ref={containerRef}
       style={{
         position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         width: '100%',
         height: role === 'student' ? '100vh' : '400px',
         background: '#000',
@@ -172,12 +181,13 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
       <canvas
         ref={canvasRef}
         style={{
-          display: phase === 'lobby' || phase === 'leaderboard' ? 'none' : 'block',
-          margin: '0 auto',
+          display: showCanvas ? 'block' : 'none',
         }}
       />
 
       {phase === 'lobby' && <LobbyOverlay playerCount={playerCount} />}
+
+      {phase === 'countdown' && <CountdownOverlay onComplete={handleCountdownComplete} />}
 
       {phase === 'checkpoint' && checkpointData && (
         <CheckpointOverlay

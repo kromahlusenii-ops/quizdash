@@ -67,10 +67,19 @@ describe('SessionManager', () => {
       expect(player.status).toBe('alive');
     });
 
-    it('rejects join when session is not in lobby', () => {
+    it('allows join when session is running', () => {
       manager.createSession('i-1', 'l-1', 's-1');
       manager.joinPlayer('s-1', 'Alice');
       manager.launchGame('s-1', sampleCheckpoints);
+      const bob = manager.joinPlayer('s-1', 'Bob');
+      expect(bob.displayName).toBe('Bob');
+    });
+
+    it('rejects join when session is in checkpoint_active', () => {
+      manager.createSession('i-1', 'l-1', 's-1');
+      manager.joinPlayer('s-1', 'Alice');
+      manager.launchGame('s-1', sampleCheckpoints);
+      manager.fireCheckpoint('s-1', 15);
       expect(() => manager.joinPlayer('s-1', 'Bob')).toThrow('INVALID_STATE');
     });
 

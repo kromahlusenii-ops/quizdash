@@ -1199,7 +1199,7 @@ var newGameState = (function() {
 
 var readyState =  (function(){
     var frames;
-    var duration = 4;
+    var duration = 0;
     
     return {
         init: function() {
@@ -1220,7 +1220,6 @@ var readyState =  (function(){
             renderer.blitMap();
             renderer.drawScore();
             renderer.drawActors();
-            renderer.drawReadyMessage();
         },
         update: function() {
             if (frames == duration*60)
