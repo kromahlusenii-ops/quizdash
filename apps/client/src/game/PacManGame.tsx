@@ -8,12 +8,23 @@ import LeaderboardOverlay from './overlays/LeaderboardOverlay';
 import SpectatorOverlay from './overlays/SpectatorOverlay';
 import type { LeaderboardEntry } from '@financegame/shared';
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+const QUESTION_INTERVAL = 5000; // 5 seconds between questions
+
 type GamePhase = 'lobby' | 'countdown' | 'playing' | 'checkpoint' | 'spectator' | 'leaderboard';
 
 interface PacManGameProps {
   role: 'student' | 'instructor';
   playerId: string;
   sessionId: string;
+}
+
+interface Question {
+  index: number;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  fact: string;
 }
 
 interface CheckpointData {
@@ -35,6 +46,13 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
     Array<{ rank: number; displayName: string; score: number }>
   >([]);
   const [playerCount, setPlayerCount] = useState(0);
+  const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(2);
+
+  // Questions loaded from server
+  const questionsRef = useRef<Question[]>([]);
+  const questionIndexRef = useRef(0);
+  const questionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { onMessage, state } = useSessionPolling(sessionId);
 
@@ -45,19 +63,75 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
     }
   }, [state]);
 
+  // Fetch all questions for this session
+  const loadQuestions = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/questions`);
+      if (res.ok) {
+        const data = await res.json();
+        questionsRef.current = data.questions || [];
+        questionIndexRef.current = 0;
+      }
+    } catch {
+      console.warn('Failed to load questions');
+    }
+  }, [sessionId]);
+
   // Initialize Pac-Man when game launches
   const initGame = useCallback(async () => {
     if (!canvasRef.current || controllerRef.current) return;
 
     try {
       const controller = await createPacManGame(canvasRef.current, {
-        onGameOver: () => {
-          // Pac-Man game over (all lives lost in-game)
-        },
+        onGameOver: () => {},
       });
       controllerRef.current = controller;
     } catch (err) {
       console.error('Failed to initialize Pac-Man:', err);
+    }
+  }, []);
+
+  // Start the auto-question timer
+  const startQuestionTimer = useCallback(() => {
+    if (questionTimerRef.current) clearInterval(questionTimerRef.current);
+
+    questionTimerRef.current = setInterval(() => {
+      const questions = questionsRef.current;
+      const idx = questionIndexRef.current;
+
+      if (idx >= questions.length) {
+        // All questions asked — cycle back to start
+        questionIndexRef.current = 0;
+        return;
+      }
+
+      const q = questions[idx];
+      questionIndexRef.current = idx + 1;
+
+      // Pause game and show question
+      if (controllerRef.current) {
+        controllerRef.current.pause();
+      }
+      setCheckpointData({
+        checkpointIndex: q.index,
+        question: q.question,
+        options: q.options,
+        timerSeconds: 15,
+      });
+      setPhase('checkpoint');
+
+      // Pause the question timer while checkpoint is active
+      if (questionTimerRef.current) {
+        clearInterval(questionTimerRef.current);
+        questionTimerRef.current = null;
+      }
+    }, QUESTION_INTERVAL);
+  }, []);
+
+  const stopQuestionTimer = useCallback(() => {
+    if (questionTimerRef.current) {
+      clearInterval(questionTimerRef.current);
+      questionTimerRef.current = null;
     }
   }, []);
 
@@ -68,54 +142,26 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
       if ((status === 'running' || status === 'checkpoint_active') && phase === 'lobby') {
         setPhase('playing');
         initGame();
-
-        if (status === 'checkpoint_active' && state.checkpoint) {
-          setCheckpointData({
-            checkpointIndex: state.checkpoint.checkpointIndex,
-            question: state.checkpoint.question,
-            options: state.checkpoint.options,
-            timerSeconds: state.checkpoint.timerSeconds,
-          });
-          setPhase('checkpoint');
-        }
+        loadQuestions().then(() => startQuestionTimer());
       } else if (status === 'ended' && phase !== 'leaderboard') {
         setFinalLeaderboard(state.finalLeaderboard || []);
         setPhase('leaderboard');
       }
     }
-  }, [state, phase, initGame]);
+  }, [state, phase, initGame, loadQuestions, startQuestionTimer]);
 
   // Listen for session messages
   useEffect(() => {
     const unsubscribe = onMessage((msg: any) => {
-      console.log('[PacManGame] received message:', msg.type);
       switch (msg.type) {
         case 'game_launched':
           setPhase('countdown');
           initGame();
-          break;
-
-        case 'checkpoint_start':
-          console.log('[PacManGame] showing checkpoint:', msg.question);
-          if (controllerRef.current) {
-            controllerRef.current.pause();
-          }
-          setCheckpointData({
-            checkpointIndex: msg.checkpointIndex,
-            question: msg.question,
-            options: msg.options,
-            timerSeconds: msg.timerSeconds,
-          });
-          setPhase('checkpoint');
-          break;
-
-        case 'checkpoint_results':
-          if (msg.leaderboard) {
-            setSpectatorLeaderboard(msg.leaderboard);
-          }
+          loadQuestions();
           break;
 
         case 'session_ended':
+          stopQuestionTimer();
           if (controllerRef.current) {
             controllerRef.current.pause();
           }
@@ -126,17 +172,31 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
     });
 
     return unsubscribe;
-  }, [onMessage, initGame]);
+  }, [onMessage, initGame, loadQuestions, stopQuestionTimer]);
 
-  // Handle countdown complete
+  // Handle countdown complete — start playing and start question timer
   const handleCountdownComplete = useCallback(() => {
     setPhase('playing');
-  }, []);
+    startQuestionTimer();
+  }, [startQuestionTimer]);
 
   // Handle checkpoint completion
   const handleCheckpointComplete = useCallback(
     (wasCorrect: boolean, eliminated: boolean) => {
+      if (wasCorrect) {
+        setScore((s) => s + 100);
+      } else {
+        setLives((l) => {
+          const newLives = l - 1;
+          if (newLives <= 0) {
+            // Will be set to spectator below
+          }
+          return newLives;
+        });
+      }
+
       if (eliminated) {
+        stopQuestionTimer();
         setPhase('spectator');
         return;
       }
@@ -150,19 +210,23 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
           controllerRef.current.triggerEnergizer();
         }
       }
+
+      // Restart question timer
+      startQuestionTimer();
     },
-    []
+    [stopQuestionTimer, startQuestionTimer]
   );
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      stopQuestionTimer();
       if (controllerRef.current) {
         controllerRef.current.destroy();
         controllerRef.current = null;
       }
     };
-  }, []);
+  }, [stopQuestionTimer]);
 
   const showCanvas = phase !== 'lobby' && phase !== 'leaderboard';
 
@@ -186,11 +250,6 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
           display: showCanvas ? 'block' : 'none',
         }}
       />
-
-      {/* Debug indicator - remove after fixing */}
-      <div style={{ position: 'absolute', top: 4, left: 4, fontSize: '10px', color: '#444', zIndex: 99 }}>
-        {phase} | {state?.session?.status ?? 'no-state'} | sid:{sessionId?.slice(0,8) ?? 'none'}
-      </div>
 
       {phase === 'lobby' && <LobbyOverlay playerCount={playerCount} />}
 
