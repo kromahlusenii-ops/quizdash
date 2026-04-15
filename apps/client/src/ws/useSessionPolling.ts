@@ -138,18 +138,25 @@ export function useSessionPolling(sessionId: string | null) {
     if (!sessionId) return;
     try {
       const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/state`);
-      if (!res.ok) return;
+      if (!res.ok) {
+        console.warn('[poll] state endpoint returned', res.status);
+        return;
+      }
       const next: SessionState = await res.json();
 
       const messages = detectTransitions(prevStateRef.current, next);
+      if (next.session.status !== prevStateRef.current?.session?.status) {
+        console.log('[poll] status transition:', prevStateRef.current?.session?.status, '→', next.session.status, 'checkpoint?', !!next.checkpoint);
+      }
       prevStateRef.current = next;
       setState(next);
 
       if (messages.length > 0) {
+        console.log('[poll] firing messages:', messages.map(m => m.type));
         fireMessages(messages);
       }
-    } catch {
-      // Network error, retry on next interval
+    } catch (err) {
+      console.warn('[poll] error:', err);
     }
   }, [sessionId, fireMessages]);
 

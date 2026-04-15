@@ -88,6 +88,7 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
   // Listen for session messages
   useEffect(() => {
     const unsubscribe = onMessage((msg: any) => {
+      console.log('[PacManGame] received message:', msg.type);
       switch (msg.type) {
         case 'game_launched':
           setPhase('countdown');
@@ -95,6 +96,7 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
           break;
 
         case 'checkpoint_start':
+          console.log('[PacManGame] showing checkpoint:', msg.question);
           if (controllerRef.current) {
             controllerRef.current.pause();
           }
@@ -184,6 +186,11 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
           display: showCanvas ? 'block' : 'none',
         }}
       />
+
+      {/* Debug indicator - remove after fixing */}
+      <div style={{ position: 'absolute', top: 4, left: 4, fontSize: '10px', color: '#444', zIndex: 99 }}>
+        {phase} | {state?.session?.status ?? 'no-state'} | sid:{sessionId?.slice(0,8) ?? 'none'}
+      </div>
 
       {phase === 'lobby' && <LobbyOverlay playerCount={playerCount} />}
 
