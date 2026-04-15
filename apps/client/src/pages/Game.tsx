@@ -1,5 +1,5 @@
 import { useLocation, useSearchParams } from 'react-router-dom';
-import PhaserGame from '../game/PhaserGame';
+import PacManGame from '../game/PacManGame';
 
 interface GameState {
   playerId: string;
@@ -16,7 +16,7 @@ export default function Game() {
 
   return (
     <div className={`${role === 'student' ? 'h-screen' : ''} bg-black`}>
-      <PhaserGame
+      <PacManGame
         role={role}
         playerId={state?.playerId || ''}
         sessionId={state?.sessionId || ''}
