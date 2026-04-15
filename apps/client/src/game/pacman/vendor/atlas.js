@@ -39,7 +39,9 @@ var atlas = (function(){
 
     var create = function() {
         drawGrid();
-        canvas = document.getElementById('atlas');
+        canvas = document.getElementById('atlas') || document.createElement('canvas');
+        canvas.style.display = 'none';
+        if (!canvas.parentElement) document.body.appendChild(canvas);
         ctx = canvas.getContext("2d");
         /*
         canvas.style.left = 0;

@@ -2545,7 +2545,9 @@ var atlas = (function(){
 
     var create = function() {
         drawGrid();
-        canvas = document.getElementById('atlas');
+        canvas = document.getElementById('atlas') || document.createElement('canvas');
+        canvas.style.display = 'none';
+        if (!canvas.parentElement) document.body.appendChild(canvas);
         ctx = canvas.getContext("2d");
         /*
         canvas.style.left = 0;
@@ -11112,6 +11114,8 @@ var overState = (function() {
 // Input
 // (Handles all key presses and touches)
 
+var _keydownHandler, _keyupHandler;
+
 (function(){
 
     // A Key Listener class (each key maps to an array of callbacks)
@@ -11157,7 +11161,7 @@ var overState = (function() {
     var keyStates = {};
 
     // hook my key listeners to the window's listeners
-    var _keydownHandler = function(e) {
+    _keydownHandler = function(e) {
         var key = (e||window.event).keyCode;
 
         // only execute at first press event
@@ -11166,7 +11170,7 @@ var overState = (function() {
             keyDownListeners.exec(key, e);
         }
     };
-    var _keyupHandler = function(e) {
+    _keyupHandler = function(e) {
         var key = (e||window.event).keyCode;
 
         keyStates[key] = false;

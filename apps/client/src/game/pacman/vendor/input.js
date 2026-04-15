@@ -2,6 +2,8 @@
 // Input
 // (Handles all key presses and touches)
 
+var _keydownHandler, _keyupHandler;
+
 (function(){
 
     // A Key Listener class (each key maps to an array of callbacks)
@@ -47,7 +49,7 @@
     var keyStates = {};
 
     // hook my key listeners to the window's listeners
-    var _keydownHandler = function(e) {
+    _keydownHandler = function(e) {
         var key = (e||window.event).keyCode;
 
         // only execute at first press event
@@ -56,7 +58,7 @@
             keyDownListeners.exec(key, e);
         }
     };
-    var _keyupHandler = function(e) {
+    _keyupHandler = function(e) {
         var key = (e||window.event).keyCode;
 
         keyStates[key] = false;
