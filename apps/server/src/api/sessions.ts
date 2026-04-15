@@ -51,6 +51,58 @@ export function createSessionsRouter(sessionManager: SessionManager): Router {
     }
   });
 
+  // POST /api/sessions/:id/join  (students join via HTTP)
+  router.post('/:id/join', (req: Request, res: Response) => {
+    try {
+      const sessionId = req.params.id;
+      const { displayName, joinCode } = req.body;
+
+      if (!displayName || !joinCode) {
+        res.status(400).json({ error: 'displayName and joinCode are required' });
+        return;
+      }
+
+      const session = sessionManager.getSession(sessionId);
+      if (!session || session.joinCode !== joinCode.toUpperCase()) {
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      }
+
+      const player = sessionManager.joinPlayer(sessionId, displayName);
+
+      broadcastToSession(sessionId, {
+        type: 'player_joined',
+        playerId: player.playerId,
+        displayName: player.displayName,
+        playerCount: session.players.size,
+      });
+
+      res.json({ playerId: player.playerId, displayName: player.displayName });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to join';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  // POST /api/sessions/:id/answer  (students submit answers via HTTP)
+  router.post('/:id/answer', (req: Request, res: Response) => {
+    try {
+      const sessionId = req.params.id;
+      const { playerId, selectedIndex } = req.body;
+
+      if (!playerId || selectedIndex === undefined) {
+        res.status(400).json({ error: 'playerId and selectedIndex are required' });
+        return;
+      }
+
+      const result = sessionManager.submitAnswer(sessionId, playerId, selectedIndex);
+      res.json(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to submit answer';
+      res.status(400).json({ error: message });
+    }
+  });
+
   // POST /api/sessions/:id/launch
   router.post('/:id/launch', requireAuth, async (req: Request, res: Response) => {
     try {
@@ -234,6 +286,111 @@ export function createSessionsRouter(sessionManager: SessionManager): Router {
       const message = err instanceof Error ? err.message : 'Internal server error';
       res.status(400).json({ error: message });
     }
+  });
+
+  // GET /api/sessions/:id/state  (polled by students for session state)
+  router.get('/:id/state', (req: Request, res: Response) => {
+    const sessionId = req.params.id;
+    const session = sessionManager.getSession(sessionId);
+
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+
+    const players = Array.from(session.players.values()).map(p => ({
+      id: p.playerId,
+      displayName: p.displayName,
+      score: p.score,
+      lives: p.lives,
+      status: p.status,
+      totalTimeMs: p.answers.reduce((sum, a) => sum + a.timeTakenMs, 0),
+    }));
+
+    const result: Record<string, unknown> = {
+      session: {
+        id: session.sessionId,
+        status: session.status,
+        currentCheckpointIndex: session.currentCheckpointIndex,
+        checkpointStartedAt: null as string | null,
+        timerSeconds: 0,
+        totalCheckpoints: session.checkpoints.length,
+      },
+      players,
+    };
+
+    // Include checkpoint data if checkpoint is active
+    if (session.status === 'checkpoint_active' && session.currentCheckpointIndex >= 0) {
+      const cp = session.checkpoints[session.currentCheckpointIndex];
+      const totalAlive = players.filter(p => p.status === 'alive').length;
+      (result.session as Record<string, unknown>).checkpointStartedAt = new Date(cp.startedAt).toISOString();
+      (result.session as Record<string, unknown>).timerSeconds = cp.timerSeconds;
+
+      result.checkpoint = {
+        question: cp.question,
+        options: cp.options,
+        timerSeconds: cp.timerSeconds,
+        checkpointIndex: session.currentCheckpointIndex,
+        answeredCount: cp.answersReceived.size,
+        totalAlive,
+      };
+    }
+
+    // Include last checkpoint results if available (for transition detection)
+    if (session.status === 'running' && session.currentCheckpointIndex >= 0) {
+      const cp = session.checkpoints[session.currentCheckpointIndex];
+      if (cp.answersReceived.size > 0) {
+        const distribution: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
+        for (const { selectedIndex } of cp.answersReceived.values()) {
+          if (selectedIndex >= 0 && selectedIndex <= 3) {
+            distribution[selectedIndex]++;
+          }
+        }
+
+        const eliminations: { playerId: string; displayName: string }[] = [];
+        for (const p of session.players.values()) {
+          if (p.status === 'eliminated' && p.lives <= 0) {
+            eliminations.push({ playerId: p.playerId, displayName: p.displayName });
+          }
+        }
+
+        const leaderboard = players
+          .filter(p => p.status !== 'disconnected')
+          .sort((a, b) => b.score - a.score)
+          .map((p, i) => ({
+            rank: i + 1,
+            displayName: p.displayName,
+            score: p.score,
+            survived: p.status === 'alive',
+            totalTimeMs: p.totalTimeMs,
+          }));
+
+        result.results = {
+          correctIndex: cp.correctIndex,
+          fact: cp.fact,
+          answerDistribution: distribution,
+          eliminations,
+          leaderboard,
+        };
+      }
+    }
+
+    // Include final leaderboard if session ended
+    if (session.status === 'ended') {
+      const leaderboard = players
+        .filter(p => p.status !== 'disconnected')
+        .sort((a, b) => b.score - a.score)
+        .map((p, i) => ({
+          rank: i + 1,
+          displayName: p.displayName,
+          score: p.score,
+          survived: p.status === 'alive',
+          totalTimeMs: p.totalTimeMs,
+        }));
+      result.finalLeaderboard = leaderboard;
+    }
+
+    res.json(result);
   });
 
   // GET /api/sessions
