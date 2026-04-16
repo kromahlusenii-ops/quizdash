@@ -13492,7 +13492,10 @@ var initPacman = function(canvasEl, options) {
     loadHighScores();
     initRenderer(canvasEl);
     atlas.create();
-    initSwipe(canvasEl.parentElement);
+    // Attach swipe listeners to the canvas itself, NOT the parent element.
+    // Siblings of the canvas (e.g. React overlays) would otherwise have their
+    // touchstart preventDefaulted as events bubble up, making buttons untappable.
+    initSwipe(canvasEl);
     gameMode = GAME_PACMAN;
     practiceMode = false;
 

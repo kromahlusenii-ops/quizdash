@@ -127,6 +127,11 @@ export default function QuestionOverlay({
 
   return (
     <div
+      // stopPropagation so vendor pacman touch handlers on ancestors can't
+      // preventDefault our taps (see pacman/vendor/input.js::initSwipe)
+      onTouchStart={(e) => e.stopPropagation()}
+      onTouchEnd={(e) => e.stopPropagation()}
+      onTouchMove={(e) => e.stopPropagation()}
       style={{
         position: 'absolute',
         inset: 0,
@@ -137,6 +142,8 @@ export default function QuestionOverlay({
         zIndex: 20,
         padding: '20px',
         overflowY: 'auto',
+        touchAction: 'manipulation',
+        pointerEvents: 'auto',
       }}
     >
       <div
