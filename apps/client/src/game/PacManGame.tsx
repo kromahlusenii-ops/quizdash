@@ -16,8 +16,9 @@ interface LeaderboardEntry {
 }
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
-const FIRST_QUESTION_DELAY_MS = 5_000;   // show first question 5s after gameplay starts
-const BETWEEN_QUESTION_DELAY_MS = 20_000; // 20s of actual gameplay between questions
+// Delay before the Nth question (0-indexed): 5s, 7s, 9s, 11s, … (+2s each time)
+const QUESTION_DELAY_BASE_MS = 5_000;
+const QUESTION_DELAY_STEP_MS = 2_000;
 
 type GamePhase = 'lobby' | 'countdown' | 'playing' | 'question' | 'spectator' | 'leaderboard';
 
@@ -51,6 +52,8 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
   // Per-player randomized queue of questions yet to ask
   const questionQueueRef = useRef<Question[]>([]);
   const questionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // How many questions have been scheduled so far — used to grow the delay.
+  const scheduledCountRef = useRef(0);
 
   const { onMessage, state } = useSessionPolling(sessionId);
 
@@ -103,27 +106,26 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
     }
   }, []);
 
-  // Schedule the next question to pop up after `delayMs` of real gameplay.
-  // Uses a one-shot setTimeout — a new one is scheduled each time a question
-  // closes, so "gameplay in between" is exactly `delayMs` regardless of how
-  // long the modal was open.
-  const scheduleNextQuestion = useCallback(
-    (delayMs: number) => {
-      stopQuestionTimer();
-      if (questionQueueRef.current.length === 0) return;
+  // Schedule the next question using a growing delay: 5s, 7s, 9s, 11s, …
+  // One-shot setTimeout so gameplay-between is measured from overlay close.
+  const scheduleNextQuestion = useCallback(() => {
+    stopQuestionTimer();
+    if (questionQueueRef.current.length === 0) return;
 
-      questionTimerRef.current = setTimeout(() => {
-        questionTimerRef.current = null;
-        const q = questionQueueRef.current.shift();
-        if (!q) return;
+    const delayMs =
+      QUESTION_DELAY_BASE_MS + scheduledCountRef.current * QUESTION_DELAY_STEP_MS;
+    scheduledCountRef.current += 1;
 
-        if (controllerRef.current) controllerRef.current.pause();
-        setCurrentQuestion(q);
-        setPhase('question');
-      }, delayMs);
-    },
-    [stopQuestionTimer]
-  );
+    questionTimerRef.current = setTimeout(() => {
+      questionTimerRef.current = null;
+      const q = questionQueueRef.current.shift();
+      if (!q) return;
+
+      if (controllerRef.current) controllerRef.current.pause();
+      setCurrentQuestion(q);
+      setPhase('question');
+    }, delayMs);
+  }, [stopQuestionTimer]);
 
   // Late-join / refresh while already running
   useEffect(() => {
@@ -132,7 +134,7 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
     if (status === 'running' && phase === 'lobby') {
       setPhase('playing');
       initGame();
-      loadQuestions().then(() => scheduleNextQuestion(FIRST_QUESTION_DELAY_MS));
+      loadQuestions().then(() => scheduleNextQuestion());
     } else if (status === 'ended' && phase !== 'leaderboard') {
       setFinalLeaderboard(state.finalLeaderboard || []);
       setPhase('leaderboard');
@@ -160,7 +162,7 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
 
   const handleCountdownComplete = useCallback(() => {
     setPhase('playing');
-    scheduleNextQuestion(FIRST_QUESTION_DELAY_MS);
+    scheduleNextQuestion();
   }, [scheduleNextQuestion]);
 
   const handleQuestionClose = useCallback(
@@ -178,7 +180,7 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
         controllerRef.current.resume();
         if (wasCorrect) controllerRef.current.triggerEnergizer();
       }
-      scheduleNextQuestion(BETWEEN_QUESTION_DELAY_MS);
+      scheduleNextQuestion();
     },
     [stopQuestionTimer, scheduleNextQuestion]
   );
