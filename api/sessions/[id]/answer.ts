@@ -1,7 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabase } from '../../_lib/supabase';
-import { broadcastToSession } from '../../_lib/broadcast';
-import { calculatePoints } from '../../_lib/scoring';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -16,19 +14,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { id: sessionId } = req.query;
 
   try {
-    const { playerId, selectedIndex, runScore } = req.body;
+    const { playerId, questionIndex, selectedIndex, runScore } = req.body;
 
-    if (!playerId || selectedIndex === undefined) {
-      return res.status(400).json({ error: 'playerId and selectedIndex are required' });
+    if (!playerId || questionIndex === undefined || selectedIndex === undefined) {
+      return res.status(400).json({ error: 'playerId, questionIndex, and selectedIndex are required' });
     }
 
-    // Runner coin score from client (capped to prevent abuse)
     const coinScore = Math.max(0, Math.min(runScore || 0, 500));
 
-    // Get session
+    // Session must be running (not lobby, not ended)
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
-      .select('*')
+      .select('id, status, lesson_id')
       .eq('id', sessionId)
       .single();
 
@@ -36,14 +33,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ error: 'Session not found' });
     }
 
-    if (session.status !== 'checkpoint_active') {
-      return res.status(400).json({ error: 'No active checkpoint' });
+    if (session.status !== 'running') {
+      return res.status(400).json({ error: 'Session is not accepting answers' });
     }
 
-    // Get player
+    // Player must be alive
     const { data: player, error: playerError } = await supabase
       .from('session_players')
-      .select('*')
+      .select('id, score, lives, status')
       .eq('id', playerId)
       .eq('session_id', sessionId)
       .single();
@@ -56,85 +53,57 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Player is eliminated' });
     }
 
-    const checkpointIndex = session.current_checkpoint_index;
-
-    // Check if already answered
-    const { data: existingAnswer } = await supabase
+    // Dedup: one answer per (player, questionIndex). DB UNIQUE constraint will
+    // also enforce this, but check first for a clean 400 instead of 500.
+    const { data: existing } = await supabase
       .from('session_answers')
       .select('id')
       .eq('session_id', sessionId)
       .eq('player_id', playerId)
-      .eq('checkpoint_index', checkpointIndex)
+      .eq('checkpoint_index', questionIndex)
       .limit(1);
 
-    if (existingAnswer && existingAnswer.length > 0) {
-      return res.status(400).json({ error: 'Already answered this checkpoint' });
+    if (existing && existing.length > 0) {
+      return res.status(400).json({ error: 'Already answered this question' });
     }
 
-    // Get checkpoint for correct answer
+    // Resolve the question's correct answer by sort_order = questionIndex
     const { data: checkpoint } = await supabase
       .from('checkpoints')
       .select('correct_index, fact')
       .eq('lesson_id', session.lesson_id)
-      .eq('sort_order', checkpointIndex)
+      .eq('sort_order', questionIndex)
       .single();
 
-    const correctIndex = checkpoint?.correct_index ?? 0;
-    const fact = checkpoint?.fact ?? '';
+    if (!checkpoint) {
+      return res.status(400).json({ error: 'Question not found' });
+    }
+
+    const correctIndex = checkpoint.correct_index;
+    const fact = checkpoint.fact ?? '';
     const correct = selectedIndex === correctIndex;
 
-    // Calculate time taken
-    const checkpointStarted = new Date(session.checkpoint_started_at).getTime();
-    const timeTakenMs = Date.now() - checkpointStarted;
-    const timerSeconds = session.timer_seconds ?? 30;
+    // Flat scoring: correct = 100, wrong = 0. Plus coin score from run.
+    // (Time-pressure bonus removed since per-player timing made it unfair.)
+    const pointsAwarded = correct ? 100 : 0;
 
-    // Calculate points
-    const pointsAwarded = calculatePoints(correct, timeTakenMs, timerSeconds);
-
-    // Update player
     const newLives = correct ? player.lives : player.lives - 1;
     const newStatus = newLives <= 0 ? 'eliminated' : 'alive';
     const newScore = player.score + pointsAwarded + coinScore;
-    const newTotalTime = (player.total_time_ms || 0) + timeTakenMs;
 
     await supabase
       .from('session_players')
-      .update({
-        score: newScore,
-        lives: newLives,
-        status: newStatus,
-        total_time_ms: newTotalTime,
-      })
+      .update({ score: newScore, lives: newLives, status: newStatus })
       .eq('id', playerId);
 
-    // Insert answer
     await supabase.from('session_answers').insert({
       session_id: sessionId,
       player_id: playerId,
-      checkpoint_index: checkpointIndex,
+      checkpoint_index: questionIndex,
       selected_index: selectedIndex,
       correct,
       points_awarded: pointsAwarded,
-      time_taken_ms: timeTakenMs,
-    });
-
-    // Get counts for live update
-    const { count: answeredCount } = await supabase
-      .from('session_answers')
-      .select('*', { count: 'exact', head: true })
-      .eq('session_id', sessionId)
-      .eq('checkpoint_index', checkpointIndex);
-
-    const { count: totalAlive } = await supabase
-      .from('session_players')
-      .select('*', { count: 'exact', head: true })
-      .eq('session_id', sessionId)
-      .eq('status', 'alive');
-
-    // Broadcast live answer count
-    await broadcastToSession(sessionId as string, 'checkpoint_answers_live', {
-      answeredCount: answeredCount ?? 0,
-      totalAlive: (totalAlive ?? 0) + (newStatus === 'eliminated' ? 1 : 0),
+      time_taken_ms: 0,
     });
 
     return res.status(200).json({

@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabase } from '../../_lib/supabase';
-import { broadcastToSession } from '../../_lib/broadcast';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -81,21 +80,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .from('session_players')
       .select('id, display_name')
       .eq('session_id', sessionId);
-
-    const newPlayerCount = allPlayers?.length ?? 0;
-
-    // Broadcast player joined
-    await broadcastToSession(sessionId as string, 'player_joined', {
-      playerId: player.id,
-      displayName: finalDisplayName,
-      playerCount: newPlayerCount,
-    });
-
-    // Broadcast lobby update
-    await broadcastToSession(sessionId as string, 'lobby_update', {
-      players: (allPlayers ?? []).map((p: any) => ({ playerId: p.id, displayName: p.display_name })),
-      playerCount: newPlayerCount,
-    });
 
     return res.status(200).json({
       playerId: player.id,

@@ -82,7 +82,7 @@ export default function SessionLobby() {
           <div className="text-center">
             <p className="text-gray-400 mb-2">Join Code</p>
             <div
-              className="text-6xl font-mono font-bold tracking-[0.3em] bg-gray-800 rounded-xl py-6 cursor-pointer hover:bg-gray-750"
+              className="text-6xl font-mono font-bold tracking-[0.3em] bg-gray-800 rounded-xl py-6 cursor-pointer hover:bg-gray-700 transition-colors"
               onClick={() => navigator.clipboard.writeText(joinCode)}
               title="Click to copy"
             >

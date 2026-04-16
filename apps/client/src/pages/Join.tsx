@@ -1,14 +1,21 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
 export default function Join() {
   const navigate = useNavigate();
+  const params = useParams<{ code?: string }>();
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (params.code) {
+      setCode(params.code.toUpperCase().slice(0, 6));
+    }
+  }, [params.code]);
 
   const isValid = code.length === 6 && name.trim().length > 0 && name.trim().length <= 20;
 
@@ -49,7 +56,13 @@ export default function Join() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-800 flex items-center justify-center px-4">
-      <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 w-full max-w-md">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleJoin();
+        }}
+        className="bg-white/10 backdrop-blur-md rounded-2xl p-8 w-full max-w-md"
+      >
         <h2 className="text-3xl font-bold text-white mb-6 text-center">Join Game</h2>
 
         <div className="space-y-4">
@@ -62,6 +75,7 @@ export default function Join() {
               placeholder="ABCDEF"
               className="w-full px-4 py-3 rounded-lg bg-white/20 text-white text-center text-2xl font-mono tracking-widest placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-green-400"
               maxLength={6}
+              autoFocus
             />
           </div>
 
@@ -84,14 +98,14 @@ export default function Join() {
           )}
 
           <button
-            onClick={handleJoin}
+            type="submit"
             disabled={!isValid || loading}
             className="w-full py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-500 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-colors text-lg"
           >
             {loading ? 'Joining...' : 'Join Game'}
           </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 }

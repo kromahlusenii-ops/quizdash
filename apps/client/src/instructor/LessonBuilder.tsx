@@ -215,7 +215,7 @@ export default function LessonBuilder() {
           {checkpoints.map((cp, index) => (
             <div key={cp.id} className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
               <div
-                className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-750"
+                className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-700"
                 onClick={() => setExpandedIndex(expandedIndex === index ? null : index)}
               >
                 <div className="flex items-center gap-3">

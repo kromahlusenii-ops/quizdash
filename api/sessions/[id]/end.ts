@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabase } from '../../_lib/supabase';
-import { broadcastToSession } from '../../_lib/broadcast';
 
 async function getUserId(req: VercelRequest): Promise<string | null> {
   const authHeader = req.headers.authorization;
@@ -105,11 +104,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ended_at: new Date().toISOString(),
       })
       .eq('id', sessionId);
-
-    // Broadcast session ended
-    await broadcastToSession(sessionId as string, 'session_ended', {
-      finalLeaderboard: leaderboard,
-    });
 
     return res.status(200).json({ success: true, leaderboard });
   } catch (err: any) {

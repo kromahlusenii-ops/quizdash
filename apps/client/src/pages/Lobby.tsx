@@ -20,7 +20,6 @@ export default function Lobby() {
   const [error, setError] = useState('');
   const joinedRef = useRef(false);
 
-  // Listen for game_launched to navigate
   useEffect(() => {
     if (!state) {
       navigate('/join');
@@ -33,26 +32,22 @@ export default function Lobby() {
           state: {
             playerId,
             sessionId: state.sessionId,
-            totalCheckpoints: msg.totalCheckpoints,
             role: 'student',
           },
         });
       }
     });
-
     return unsub;
   }, [state, onMessage, navigate, playerId]);
 
-  // Navigate to game if session already launched (detected via polling state)
+  // Navigate to game if session already running when we arrive
   useEffect(() => {
     if (!state || !playerId || !sessionState) return;
-    const status = sessionState.session.status;
-    if (status === 'running' || status === 'checkpoint_active') {
+    if (sessionState.session.status === 'running') {
       navigate('/game', {
         state: {
           playerId,
           sessionId: state.sessionId,
-          totalCheckpoints: sessionState.session.totalCheckpoints,
           role: 'student',
         },
       });
@@ -94,7 +89,6 @@ export default function Lobby() {
 
   if (!state) return null;
 
-  // Player list from polling state
   const players = sessionState?.players ?? [];
 
   return (

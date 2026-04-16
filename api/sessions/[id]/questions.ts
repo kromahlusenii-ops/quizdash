@@ -26,7 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { data: checkpoints, error: cpError } = await supabase
       .from('checkpoints')
-      .select('question, options, correct_index, fact, sort_order')
+      .select('question, options, sort_order')
       .eq('lesson_id', session.lesson_id)
       .order('sort_order', { ascending: true });
 
@@ -34,13 +34,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: cpError.message });
     }
 
+    // Do NOT return correct_index or fact — those come back only via /answer
+    // after the student submits. Otherwise DevTools reveals the quiz answers.
     return res.status(200).json({
       questions: (checkpoints ?? []).map((cp: any, i: number) => ({
         index: i,
         question: cp.question,
         options: cp.options,
-        correctIndex: cp.correct_index,
-        fact: cp.fact,
       })),
     });
   } catch (err: any) {

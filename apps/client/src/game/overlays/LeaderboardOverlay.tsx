@@ -1,4 +1,10 @@
-import type { LeaderboardEntry } from '@financegame/shared';
+interface LeaderboardEntry {
+  rank: number;
+  playerId?: string;
+  displayName: string;
+  score: number;
+  survived: boolean;
+}
 
 interface LeaderboardOverlayProps {
   leaderboard: LeaderboardEntry[];
@@ -107,7 +113,7 @@ export default function LeaderboardOverlay({ leaderboard, playerId }: Leaderboar
       {/* Full list */}
       <div style={{ width: '100%', maxWidth: '420px' }}>
         {leaderboard.map((entry) => {
-          const isMe = entry.displayName === playerId;
+          const isMe = entry.playerId === playerId;
           return (
             <div
               key={entry.rank}
@@ -153,7 +159,7 @@ export default function LeaderboardOverlay({ leaderboard, playerId }: Leaderboar
       {/* Play Again */}
       <button
         onClick={() => {
-          window.location.href = '/join';
+          window.location.assign('/join');
         }}
         style={{
           marginTop: '20px',

@@ -6,3 +6,6 @@ dist
 *.db
 data/
 .DS_Store
+
+# Upstream Pac-Man reference repo (source of vendored files in apps/client/src/game/pacman/vendor/)
+/pacman/

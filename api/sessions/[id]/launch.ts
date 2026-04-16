@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabase } from '../../_lib/supabase';
-import { broadcastToSession } from '../../_lib/broadcast';
 
 async function getUserId(req: VercelRequest): Promise<string | null> {
   const authHeader = req.headers.authorization;
@@ -50,7 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (cpError) return res.status(400).json({ error: cpError.message });
 
-    const totalCheckpoints = checkpoints?.length ?? 0;
+    const totalQuestions = checkpoints?.length ?? 0;
 
     // Update session status
     const { error: updateError } = await supabase
@@ -63,10 +62,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (updateError) return res.status(400).json({ error: updateError.message });
 
-    // Broadcast game launched
-    await broadcastToSession(sessionId as string, 'game_launched', { totalCheckpoints });
-
-    return res.status(200).json({ success: true, totalCheckpoints });
+    return res.status(200).json({ success: true, totalQuestions });
   } catch (err: any) {
     return res.status(500).json({ error: err.message || 'Internal server error' });
   }

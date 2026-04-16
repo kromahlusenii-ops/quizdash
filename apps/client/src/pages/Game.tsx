@@ -4,7 +4,6 @@ import PacManGame from '../game/PacManGame';
 interface GameState {
   playerId: string;
   sessionId: string;
-  totalCheckpoints: number;
   role: 'student' | 'instructor';
 }
 
