@@ -16,7 +16,8 @@ interface LeaderboardEntry {
 }
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
-const QUESTION_INTERVAL_MS = 5_000; // 5s of gameplay between questions
+const FIRST_QUESTION_DELAY_MS = 5_000;   // show first question 5s after gameplay starts
+const BETWEEN_QUESTION_DELAY_MS = 20_000; // 20s of actual gameplay between questions
 
 type GamePhase = 'lobby' | 'countdown' | 'playing' | 'question' | 'spectator' | 'leaderboard';
 
@@ -49,7 +50,7 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
 
   // Per-player randomized queue of questions yet to ask
   const questionQueueRef = useRef<Question[]>([]);
-  const questionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const questionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { onMessage, state } = useSessionPolling(sessionId);
 
@@ -97,30 +98,32 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
 
   const stopQuestionTimer = useCallback(() => {
     if (questionTimerRef.current) {
-      clearInterval(questionTimerRef.current);
+      clearTimeout(questionTimerRef.current);
       questionTimerRef.current = null;
     }
   }, []);
 
-  const startQuestionTimer = useCallback(() => {
-    stopQuestionTimer();
-    // If queue is already empty, don't bother scheduling.
-    if (questionQueueRef.current.length === 0) return;
+  // Schedule the next question to pop up after `delayMs` of real gameplay.
+  // Uses a one-shot setTimeout — a new one is scheduled each time a question
+  // closes, so "gameplay in between" is exactly `delayMs` regardless of how
+  // long the modal was open.
+  const scheduleNextQuestion = useCallback(
+    (delayMs: number) => {
+      stopQuestionTimer();
+      if (questionQueueRef.current.length === 0) return;
 
-    questionTimerRef.current = setInterval(() => {
-      const q = questionQueueRef.current.shift();
-      if (!q) {
-        // Queue exhausted — student keeps playing without further interruptions.
-        stopQuestionTimer();
-        return;
-      }
+      questionTimerRef.current = setTimeout(() => {
+        questionTimerRef.current = null;
+        const q = questionQueueRef.current.shift();
+        if (!q) return;
 
-      if (controllerRef.current) controllerRef.current.pause();
-      setCurrentQuestion(q);
-      setPhase('question');
-      stopQuestionTimer(); // pause scheduling while modal is open
-    }, QUESTION_INTERVAL_MS);
-  }, [stopQuestionTimer]);
+        if (controllerRef.current) controllerRef.current.pause();
+        setCurrentQuestion(q);
+        setPhase('question');
+      }, delayMs);
+    },
+    [stopQuestionTimer]
+  );
 
   // Late-join / refresh while already running
   useEffect(() => {
@@ -129,12 +132,12 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
     if (status === 'running' && phase === 'lobby') {
       setPhase('playing');
       initGame();
-      loadQuestions().then(() => startQuestionTimer());
+      loadQuestions().then(() => scheduleNextQuestion(FIRST_QUESTION_DELAY_MS));
     } else if (status === 'ended' && phase !== 'leaderboard') {
       setFinalLeaderboard(state.finalLeaderboard || []);
       setPhase('leaderboard');
     }
-  }, [state, phase, initGame, loadQuestions, startQuestionTimer]);
+  }, [state, phase, initGame, loadQuestions, scheduleNextQuestion]);
 
   useEffect(() => {
     const unsubscribe = onMessage((msg: any) => {
@@ -157,8 +160,8 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
 
   const handleCountdownComplete = useCallback(() => {
     setPhase('playing');
-    startQuestionTimer();
-  }, [startQuestionTimer]);
+    scheduleNextQuestion(FIRST_QUESTION_DELAY_MS);
+  }, [scheduleNextQuestion]);
 
   const handleQuestionClose = useCallback(
     (wasCorrect: boolean, eliminated: boolean) => {
@@ -175,9 +178,9 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
         controllerRef.current.resume();
         if (wasCorrect) controllerRef.current.triggerEnergizer();
       }
-      startQuestionTimer();
+      scheduleNextQuestion(BETWEEN_QUESTION_DELAY_MS);
     },
-    [stopQuestionTimer, startQuestionTimer]
+    [stopQuestionTimer, scheduleNextQuestion]
   );
 
   useEffect(() => {
