@@ -66,7 +66,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         session_id: sessionId,
         display_name: finalDisplayName,
         score: 0,
-        lives: 2,
+        lives: 3,
         status: 'alive',
         total_time_ms: 0,
       })

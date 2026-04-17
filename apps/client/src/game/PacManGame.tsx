@@ -45,7 +45,7 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
 
   // HUD
   const [score, setScore] = useState(0);
-  const [lives, setLives] = useState(2);
+  const [lives, setLives] = useState(3);
   const [questionsAnswered, setQuestionsAnswered] = useState(0);
   const [totalQuestions, setTotalQuestions] = useState(0);
 
@@ -244,7 +244,7 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
           </span>
           <span style={{ color: '#ff6666' }}>
             {'♥'.repeat(Math.max(0, lives))}
-            <span style={{ color: '#444' }}>{'♥'.repeat(Math.max(0, 2 - lives))}</span>
+            <span style={{ color: '#444' }}>{'♥'.repeat(Math.max(0, 3 - lives))}</span>
           </span>
         </div>
       )}
