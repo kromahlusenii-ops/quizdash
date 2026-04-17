@@ -46,23 +46,7 @@ export default function QuestionOverlay({
   const [result, setResult] = useState<AnswerResult | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Countdown
-  useEffect(() => {
-    timerRef.current = setInterval(() => {
-      setSecondsLeft((s) => {
-        if (s <= 1) {
-          if (timerRef.current) clearInterval(timerRef.current);
-          setAnswered(true); // time out → locked
-          return 0;
-        }
-        return s - 1;
-      });
-    }, 1000);
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, []);
+  const timedOutRef = useRef(false);
 
   const submitAnswer = useCallback(
     async (index: number) => {
@@ -105,20 +89,33 @@ export default function QuestionOverlay({
     }
   }, [result, onClose]);
 
-  // On error OR on time-out with no answer, close after a short delay
+  // Countdown — when it hits 0, auto-submit as wrong (loses a life)
+  useEffect(() => {
+    timerRef.current = setInterval(() => {
+      setSecondsLeft((s) => {
+        if (s <= 1) {
+          if (timerRef.current) clearInterval(timerRef.current);
+          if (!timedOutRef.current) {
+            timedOutRef.current = true;
+            submitAnswer(-1);
+          }
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [submitAnswer]);
+
+  // On error, close after a short delay
   useEffect(() => {
     if (submitError) {
       const t = setTimeout(() => onClose(false, false), 1500);
       return () => clearTimeout(t);
     }
   }, [submitError, onClose]);
-
-  useEffect(() => {
-    if (answered && secondsLeft === 0 && !result && !submitError && selectedIndex === null) {
-      const t = setTimeout(() => onClose(false, false), 1500);
-      return () => clearTimeout(t);
-    }
-  }, [answered, secondsLeft, result, submitError, selectedIndex, onClose]);
 
   const progress = secondsLeft / TIMER_SECONDS;
   const circumference = 2 * Math.PI * 22;

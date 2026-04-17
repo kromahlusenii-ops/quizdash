@@ -1,11 +1,14 @@
 interface SpectatorOverlayProps {
   leaderboard?: Array<{ rank: number; displayName: string; score: number }>;
+  reason?: 'eliminated' | 'completed';
 }
 
-export default function SpectatorOverlay({ leaderboard }: SpectatorOverlayProps) {
+export default function SpectatorOverlay({ leaderboard, reason = 'eliminated' }: SpectatorOverlayProps) {
+  const isCompleted = reason === 'completed';
+
   return (
     <>
-      {/* Eliminated banner at top */}
+      {/* Top banner */}
       <div
         style={{
           position: 'absolute',
@@ -20,12 +23,14 @@ export default function SpectatorOverlay({ leaderboard }: SpectatorOverlayProps)
       >
         <span
           style={{
-            fontSize: '16px',
-            color: '#ff6666',
+            fontSize: '14px',
+            color: isCompleted ? '#2ecc71' : '#ff6666',
             fontWeight: 'bold',
           }}
         >
-          Eliminated - Spectating
+          {isCompleted
+            ? 'All Questions Complete! Waiting for results…'
+            : 'Eliminated — Spectating'}
         </span>
       </div>
 

@@ -11072,7 +11072,9 @@ var finishState = (function(){
             204: { draw: function() { flashFloorAndDraw(false); } },
             216: {
                 init: function() {
-                    if (!triggerCutsceneAtEndLevel()) {
+                    if (_onLevelComplete) {
+                        _onLevelComplete();
+                    } else if (!triggerCutsceneAtEndLevel()) {
                         switchState(readyNewState,60);
                     }
                 }
@@ -11084,6 +11086,9 @@ var finishState = (function(){
 ////////////////////////////////////////////////////
 // Game Over state
 // (state when player has lost last life)
+
+var _onLevelComplete = null;
+var setOnLevelComplete = function(cb) { _onLevelComplete = cb; };
 
 var _onGameOver = null;
 var setOnGameOver = function(cb) { _onGameOver = cb; };
@@ -13502,6 +13507,9 @@ var initPacman = function(canvasEl, options) {
     if (options.onGameOver) {
         setOnGameOver(options.onGameOver);
     }
+    if (options.onLevelComplete) {
+        setOnLevelComplete(options.onLevelComplete);
+    }
 
     switchState(newGameState);
     executive.init();
@@ -13515,6 +13523,7 @@ window.__pacman = {
     getScore: getScore,
     cleanupInput: cleanupInput,
     audio: audio,
+    setOnLevelComplete: setOnLevelComplete,
 };
 
 })();

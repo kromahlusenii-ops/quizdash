@@ -42,6 +42,7 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [finalLeaderboard, setFinalLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [playerCount, setPlayerCount] = useState(0);
+  const [allQuestionsAnswered, setAllQuestionsAnswered] = useState(false);
 
   // HUD
   const [score, setScore] = useState(0);
@@ -52,11 +53,11 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
   // Per-player randomized queue of questions yet to ask
   const questionQueueRef = useRef<Question[]>([]);
   const questionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // How many questions have been scheduled so far — used to grow the delay.
   const scheduledCountRef = useRef(0);
 
   const { onMessage, state } = useSessionPolling(sessionId);
 
+  // Sync HUD from server state
   useEffect(() => {
     if (state?.players) {
       setPlayerCount(state.players.length);
@@ -65,10 +66,14 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
         setScore(me.score);
         setLives(me.lives);
         setQuestionsAnswered(me.questionsAnswered);
+        // Restore completed state on refresh
+        if (me.status === 'completed' && !allQuestionsAnswered) {
+          setAllQuestionsAnswered(true);
+        }
       }
       setTotalQuestions(state.session.totalQuestions);
     }
-  }, [state, playerId]);
+  }, [state, playerId, allQuestionsAnswered]);
 
   // Load + shuffle questions
   const loadQuestions = useCallback(async () => {
@@ -77,7 +82,6 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
       if (!res.ok) return;
       const data = await res.json();
       const questions: Question[] = data.questions || [];
-      // Fisher-Yates shuffle per player
       for (let i = questions.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [questions[i], questions[j]] = [questions[j], questions[i]];
@@ -92,7 +96,10 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
   const initGame = useCallback(async () => {
     if (!canvasRef.current || controllerRef.current) return;
     try {
-      const controller = await createPacManGame(canvasRef.current, { onGameOver: () => {} });
+      const controller = await createPacManGame(canvasRef.current, {
+        onGameOver: () => {},
+        onLevelComplete: () => {},
+      });
       controllerRef.current = controller;
     } catch (err) {
       console.error('Failed to initialize Pac-Man:', err);
@@ -106,11 +113,12 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
     }
   }, []);
 
-  // Schedule the next question using a growing delay: 5s, 7s, 9s, 11s, …
-  // One-shot setTimeout so gameplay-between is measured from overlay close.
   const scheduleNextQuestion = useCallback(() => {
     stopQuestionTimer();
-    if (questionQueueRef.current.length === 0) return;
+    if (questionQueueRef.current.length === 0) {
+      setAllQuestionsAnswered(true);
+      return;
+    }
 
     const delayMs =
       QUESTION_DELAY_BASE_MS + scheduledCountRef.current * QUESTION_DELAY_STEP_MS;
@@ -119,13 +127,39 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
     questionTimerRef.current = setTimeout(() => {
       questionTimerRef.current = null;
       const q = questionQueueRef.current.shift();
-      if (!q) return;
+      if (!q) {
+        setAllQuestionsAnswered(true);
+        return;
+      }
 
       if (controllerRef.current) controllerRef.current.pause();
       setCurrentQuestion(q);
       setPhase('question');
     }, delayMs);
   }, [stopQuestionTimer]);
+
+  // Re-register engine callbacks when allQuestionsAnswered changes.
+  // Both "Pac-Man death" and "cleared the board" → spectator when quiz is done.
+  useEffect(() => {
+    const ctrl = controllerRef.current;
+    if (!ctrl) return;
+
+    ctrl.onGameOver(() => {
+      stopQuestionTimer();
+      setPhase('spectator');
+    });
+
+    if (allQuestionsAnswered) {
+      ctrl.onLevelComplete(() => {
+        stopQuestionTimer();
+        ctrl.pause();
+        setPhase('spectator');
+      });
+    } else {
+      // While questions remain, let Pac-Man advance to the next level normally
+      ctrl.onLevelComplete(null);
+    }
+  }, [allQuestionsAnswered, stopQuestionTimer]);
 
   // Late-join / refresh while already running
   useEffect(() => {
@@ -198,12 +232,13 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
   const showCanvas = phase !== 'lobby' && phase !== 'leaderboard';
   const showHUD = phase === 'playing' || phase === 'question' || phase === 'spectator';
 
-  // Spectator sees live top players
   const spectatorBoard = (state?.players ?? [])
     .slice()
     .sort((a, b) => b.score - a.score)
     .slice(0, 8)
     .map((p, i) => ({ rank: i + 1, displayName: p.displayName, score: p.score }));
+
+  const spectatorReason = allQuestionsAnswered ? 'completed' as const : 'eliminated' as const;
 
   return (
     <div
@@ -265,7 +300,9 @@ export default function PacManGame({ role, playerId, sessionId }: PacManGameProp
         />
       )}
 
-      {phase === 'spectator' && <SpectatorOverlay leaderboard={spectatorBoard} />}
+      {phase === 'spectator' && (
+        <SpectatorOverlay leaderboard={spectatorBoard} reason={spectatorReason} />
+      )}
 
       {phase === 'leaderboard' && (
         <LeaderboardOverlay leaderboard={finalLeaderboard} playerId={playerId} />

@@ -16,6 +16,9 @@ var initPacman = function(canvasEl, options) {
     if (options.onGameOver) {
         setOnGameOver(options.onGameOver);
     }
+    if (options.onLevelComplete) {
+        setOnLevelComplete(options.onLevelComplete);
+    }
 
     switchState(newGameState);
     executive.init();
@@ -29,4 +32,5 @@ window.__pacman = {
     getScore: getScore,
     cleanupInput: cleanupInput,
     audio: audio,
+    setOnLevelComplete: setOnLevelComplete,
 };

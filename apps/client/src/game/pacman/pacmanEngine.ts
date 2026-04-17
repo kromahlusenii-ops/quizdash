@@ -26,12 +26,14 @@ declare global {
       audio: {
         silence: (noResetTime?: boolean) => void;
       };
+      setOnLevelComplete: (cb: (() => void) | null) => void;
     };
   }
 }
 
 interface PacManOptions {
   onGameOver?: () => void;
+  onLevelComplete?: () => void;
 }
 
 export interface PacManController {
@@ -42,6 +44,7 @@ export interface PacManController {
   getScore: () => number;
   triggerEnergizer: () => void;
   onGameOver: (cb: () => void) => void;
+  onLevelComplete: (cb: (() => void) | null) => void;
 }
 
 let scriptLoaded = false;
@@ -70,10 +73,14 @@ export async function createPacManGame(
 
   const pm = window.__pacman!;
   let gameOverCallback = options?.onGameOver || null;
+  let levelCompleteCallback = options?.onLevelComplete || null;
 
   pm.initPacman(canvas, {
     onGameOver: () => {
       if (gameOverCallback) gameOverCallback();
+    },
+    onLevelComplete: () => {
+      if (levelCompleteCallback) levelCompleteCallback();
     },
   });
 
@@ -100,6 +107,10 @@ export async function createPacManGame(
     },
     onGameOver(cb: () => void) {
       gameOverCallback = cb;
+    },
+    onLevelComplete(cb: (() => void) | null) {
+      levelCompleteCallback = cb;
+      pm.setOnLevelComplete(cb ? () => { if (levelCompleteCallback) levelCompleteCallback(); } : null);
     },
   };
 }

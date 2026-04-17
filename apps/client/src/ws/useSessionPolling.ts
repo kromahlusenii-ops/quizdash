@@ -10,7 +10,7 @@ export interface PlayerStats {
   displayName: string;
   score: number;
   lives: number;
-  status: 'alive' | 'eliminated' | 'disconnected';
+  status: 'alive' | 'eliminated' | 'completed' | 'disconnected';
   questionsAnswered: number;
   questionsCorrect: number;
 }
