@@ -26,29 +26,20 @@ export default function SessionLobby() {
     try {
       const res = await fetch(`${API_BASE}/api/sessions`, { headers: getAuthHeaders() });
       if (!res.ok) return;
-
       const sessions = await res.json();
       const current = sessions.find((s: { id: string }) => s.id === id);
       if (current) {
         setJoinCode(current.join_code);
         const joinUrl = `${APP_URL}/join/${current.join_code}`;
         try {
-          const qr = await QRCode.toDataURL(joinUrl, { width: 200, margin: 2 });
+          const qr = await QRCode.toDataURL(joinUrl, { width: 200, margin: 2, color: { dark: '#2121de', light: '#000000' } });
           setQrDataUrl(qr);
-        } catch {
-          // QR generation failed
-        }
+        } catch {}
       }
-    } catch {
-      // Load failed
-    }
+    } catch {}
   }
 
-  // Players come from polling state
-  const players = (sessionState?.players ?? []).map((p) => ({
-    id: p.id,
-    name: p.displayName,
-  }));
+  const players = (sessionState?.players ?? []).map((p) => ({ id: p.id, name: p.displayName }));
 
   async function launchGame() {
     setLoading(true);
@@ -57,38 +48,30 @@ export default function SessionLobby() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       });
-
-      if (res.ok) {
-        navigate(`/instructor/sessions/${id}/live`);
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to launch');
-      }
-    } catch {
-      alert('Failed to launch game');
-    } finally {
-      setLoading(false);
-    }
+      if (res.ok) navigate(`/instructor/sessions/${id}/live`);
+      else { const d = await res.json(); alert(d.error || 'Failed to launch'); }
+    } catch { alert('Failed to launch game'); }
+    finally { setLoading(false); }
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <header className="bg-gray-800 border-b border-gray-700 px-6 py-4">
-        <h1 className="text-2xl font-bold">Session Lobby</h1>
+    <div className="min-h-screen bg-bg text-white">
+      <header className="border-b border-line px-6 py-4">
+        <h1 className="font-arcade text-sm text-accent">SESSION LOBBY</h1>
       </header>
 
       <main className="max-w-4xl mx-auto p-6">
         <div className="grid md:grid-cols-2 gap-8">
           <div className="text-center">
-            <p className="text-gray-400 mb-2">Join Code</p>
+            <p className="text-dim text-xs mb-2">JOIN CODE</p>
             <div
-              className="text-6xl font-mono font-bold tracking-[0.3em] bg-gray-800 rounded-xl py-6 cursor-pointer hover:bg-gray-700 transition-colors"
+              className="text-5xl font-mono font-bold tracking-[0.3em] bg-surface border border-accent-blue rounded-xl py-6 cursor-pointer hover:border-accent-hover transition-colors shadow-[0_0_30px_rgba(33,33,222,0.15)]"
               onClick={() => navigator.clipboard.writeText(joinCode)}
               title="Click to copy"
             >
               {joinCode}
             </div>
-            <p className="text-gray-500 text-sm mt-2">Click to copy</p>
+            <p className="text-dim text-xs mt-2">Click to copy</p>
 
             {qrDataUrl && (
               <div className="mt-4 flex justify-center">
@@ -96,25 +79,25 @@ export default function SessionLobby() {
               </div>
             )}
 
-            <p className="text-gray-400 mt-2 text-sm">
-              Join at: {APP_URL}/join/{joinCode}
+            <p className="text-dim mt-2 text-xs">
+              {APP_URL}/join/{joinCode}
             </p>
           </div>
 
           <div>
-            <h3 className="text-lg font-semibold mb-4">
-              Players ({players.length}/50)
+            <h3 className="text-[10px] font-arcade text-muted tracking-wider mb-4">
+              PLAYERS ({players.length}/50)
             </h3>
 
-            <div className="bg-gray-800 rounded-xl p-4 min-h-[200px] max-h-[400px] overflow-y-auto">
+            <div className="bg-surface border border-line rounded-xl p-4 min-h-[200px] max-h-[400px] overflow-y-auto">
               {players.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">Waiting for players to join...</p>
+                <p className="text-dim text-center py-8 text-xs">Waiting for players to join...</p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {players.map((p) => (
-                    <div key={p.id} className="flex items-center gap-2 px-3 py-2 bg-gray-700 rounded-lg">
-                      <div className="w-3 h-3 rounded-full bg-green-400" />
-                      <span>{p.name}</span>
+                    <div key={p.id} className="flex items-center gap-2 px-3 py-2 bg-surface-alt rounded-lg">
+                      <div className="w-2 h-2 rounded-full bg-success" />
+                      <span className="text-sm">{p.name}</span>
                     </div>
                   ))}
                 </div>
@@ -124,15 +107,13 @@ export default function SessionLobby() {
             <button
               onClick={launchGame}
               disabled={players.length === 0 || loading}
-              className="w-full mt-4 py-4 bg-green-500 hover:bg-green-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xl font-bold rounded-xl transition-colors"
+              className="w-full mt-4 py-4 bg-accent hover:bg-accent-hover disabled:bg-surface disabled:text-dim disabled:cursor-not-allowed text-white font-arcade text-xs rounded-xl transition-colors shadow-[0_0_20px_rgba(33,33,222,0.3)]"
             >
-              {loading ? 'Launching...' : 'Launch Game'}
+              {loading ? 'LAUNCHING...' : 'LAUNCH GAME'}
             </button>
 
             {players.length === 0 && (
-              <p className="text-yellow-400 text-sm text-center mt-2">
-                Need at least 1 player to launch
-              </p>
+              <p className="text-gold text-xs text-center mt-2">Need at least 1 player</p>
             )}
           </div>
         </div>

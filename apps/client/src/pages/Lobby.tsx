@@ -21,40 +21,22 @@ export default function Lobby() {
   const joinedRef = useRef(false);
 
   useEffect(() => {
-    if (!state) {
-      navigate('/join');
-      return;
-    }
-
+    if (!state) { navigate('/join'); return; }
     const unsub = onMessage((msg: any) => {
       if (msg.type === 'game_launched') {
-        navigate('/game', {
-          state: {
-            playerId,
-            sessionId: state.sessionId,
-            role: 'student',
-          },
-        });
+        navigate('/game', { state: { playerId, sessionId: state.sessionId, role: 'student' } });
       }
     });
     return unsub;
   }, [state, onMessage, navigate, playerId]);
 
-  // Navigate to game if session already running when we arrive
   useEffect(() => {
     if (!state || !playerId || !sessionState) return;
     if (sessionState.session.status === 'running') {
-      navigate('/game', {
-        state: {
-          playerId,
-          sessionId: state.sessionId,
-          role: 'student',
-        },
-      });
+      navigate('/game', { state: { playerId, sessionId: state.sessionId, role: 'student' } });
     }
   }, [sessionState, state, playerId, navigate]);
 
-  // Join via HTTP POST immediately
   useEffect(() => {
     if (state && !joinedRef.current) {
       joinedRef.current = true;
@@ -68,23 +50,16 @@ export default function Lobby() {
       const res = await fetch(`${API_BASE}/api/sessions/${state.sessionId}/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          displayName: state.displayName,
-          joinCode: state.joinCode,
-        }),
+        body: JSON.stringify({ displayName: state.displayName, joinCode: state.joinCode }),
       });
-
       if (!res.ok) {
         const data = await res.json();
         setError(data.error || 'Failed to join session');
         return;
       }
-
       const data = await res.json();
       setPlayerId(data.playerId);
-    } catch {
-      setError('Could not connect to server');
-    }
+    } catch { setError('Could not connect to server'); }
   }
 
   if (!state) return null;
@@ -92,30 +67,31 @@ export default function Lobby() {
   const players = sessionState?.players ?? [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-800 flex flex-col items-center justify-center px-4">
-      <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 w-full max-w-md text-center">
-        <h2 className="text-2xl font-bold text-white mb-2">{state.lessonTitle}</h2>
-        <p className="text-purple-200 mb-6">
+    <div className="min-h-screen bg-bg flex flex-col items-center justify-center px-4">
+      <div className="bg-surface rounded-2xl p-8 w-full max-w-md text-center border border-line arcade-border">
+        <p className="font-arcade text-accent text-[10px] tracking-widest mb-2">QUIZDASH</p>
+        <h2 className="text-xl font-bold text-white mb-1">{state.lessonTitle}</h2>
+        <p className="text-dim text-sm mb-6">
           Waiting for instructor to start
           <span className="animate-pulse">...</span>
         </p>
 
         {error && (
-          <div className="bg-red-500/20 border border-red-400 text-red-200 px-4 py-2 rounded-lg text-sm mb-4">
+          <div className="bg-danger/10 border border-danger/40 text-danger px-4 py-2 rounded-lg text-sm mb-4">
             {error}
           </div>
         )}
 
-        <div className="bg-white/5 rounded-xl p-4 mb-4">
-          <p className="text-purple-300 text-sm mb-2">Players ({players.length})</p>
+        <div className="bg-surface-alt rounded-xl p-4 mb-4 border border-line">
+          <p className="text-muted text-xs mb-2">Players ({players.length})</p>
           <div className="flex flex-wrap gap-2 justify-center">
             {players.map((p) => (
               <span
                 key={p.id}
-                className={`px-3 py-1 rounded-full text-sm ${
+                className={`px-3 py-1 rounded-full text-xs ${
                   p.id === playerId
-                    ? 'bg-green-500 text-white'
-                    : 'bg-white/10 text-purple-200'
+                    ? 'bg-accent text-white'
+                    : 'bg-surface text-muted border border-line'
                 }`}
               >
                 {p.displayName}

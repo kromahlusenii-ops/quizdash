@@ -38,7 +38,6 @@ export default function Join() {
         return;
       }
 
-      // Navigate to lobby with join info
       navigate('/lobby', {
         state: {
           joinCode: code.toUpperCase(),
@@ -55,44 +54,44 @@ export default function Join() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-800 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-bg flex items-center justify-center px-4">
       <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleJoin();
-        }}
-        className="bg-white/10 backdrop-blur-md rounded-2xl p-8 w-full max-w-md"
+        onSubmit={(e) => { e.preventDefault(); handleJoin(); }}
+        className="bg-surface rounded-2xl p-8 w-full max-w-md border border-line arcade-border"
       >
-        <h2 className="text-3xl font-bold text-white mb-6 text-center">Join Game</h2>
+        <p className="text-center font-arcade text-accent text-[10px] tracking-widest mb-1">
+          QUIZDASH
+        </p>
+        <h2 className="text-2xl font-bold text-white mb-6 text-center">Join Game</h2>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-purple-200 text-sm mb-1">Game Code</label>
+            <label className="block text-dim text-xs mb-1">Game Code</label>
             <input
               type="text"
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase().slice(0, 6))}
               placeholder="ABCDEF"
-              className="w-full px-4 py-3 rounded-lg bg-white/20 text-white text-center text-2xl font-mono tracking-widest placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-green-400"
+              className="w-full px-4 py-3 rounded-lg bg-surface-alt border border-line text-white text-center text-2xl font-mono tracking-widest placeholder-dim focus:outline-none focus:border-accent transition-colors"
               maxLength={6}
               autoFocus
             />
           </div>
 
           <div>
-            <label className="block text-purple-200 text-sm mb-1">Your Name</label>
+            <label className="block text-dim text-xs mb-1">Your Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value.slice(0, 20))}
               placeholder="Enter your name"
-              className="w-full px-4 py-3 rounded-lg bg-white/20 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-green-400"
+              className="w-full px-4 py-3 rounded-lg bg-surface-alt border border-line text-white placeholder-dim focus:outline-none focus:border-accent transition-colors"
               maxLength={20}
             />
           </div>
 
           {error && (
-            <div className="bg-red-500/20 border border-red-400 text-red-200 px-4 py-2 rounded-lg text-sm">
+            <div className="bg-danger/10 border border-danger/40 text-danger px-4 py-2 rounded-lg text-sm">
               {error}
             </div>
           )}
@@ -100,7 +99,7 @@ export default function Join() {
           <button
             type="submit"
             disabled={!isValid || loading}
-            className="w-full py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-500 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-colors text-lg"
+            className="w-full py-3 bg-accent hover:bg-accent-hover disabled:bg-surface-alt disabled:text-dim text-white font-bold rounded-lg transition-colors text-lg shadow-[0_0_20px_rgba(33,33,222,0.3)]"
           >
             {loading ? 'Joining...' : 'Join Game'}
           </button>

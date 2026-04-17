@@ -67,7 +67,7 @@ export default function SessionHistory() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-bg flex items-center justify-center">
         <p className="text-white">Loading results...</p>
       </div>
     );
@@ -78,12 +78,12 @@ export default function SessionHistory() {
   const overallPct = overallTotal > 0 ? Math.round((overallCorrect / overallTotal) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <header className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex justify-between items-center">
-        <button onClick={() => navigate('/instructor')} className="text-gray-400 hover:text-white text-sm">
+    <div className="min-h-screen bg-bg text-white">
+      <header className="border-b border-line px-6 py-4 flex justify-between items-center">
+        <button onClick={() => navigate('/instructor')} className="text-dim hover:text-white text-xs transition-colors">
           &larr; Back
         </button>
-        <h1 className="text-base font-semibold">Session Results</h1>
+        <h1 className="font-arcade text-sm text-accent">RESULTS</h1>
       </header>
 
       <main className="max-w-4xl mx-auto p-6 space-y-6">
@@ -105,10 +105,10 @@ export default function SessionHistory() {
             ].map((stat) => (
               <div
                 key={stat.label}
-                className="bg-gray-800 rounded-lg px-4 py-3 border border-gray-700 flex-1 min-w-[120px]"
+                className="bg-surface rounded-lg px-4 py-3 border border-line flex-1 min-w-[120px]"
               >
                 <p className="text-2xl font-bold">{stat.value}</p>
-                <p className="text-gray-500 text-xs">{stat.label}</p>
+                <p className="text-dim text-xs">{stat.label}</p>
               </div>
             ))}
           </div>
@@ -116,17 +116,17 @@ export default function SessionHistory() {
 
         {/* Leaderboard */}
         {leaderboard.length > 0 && (
-          <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
-              Leaderboard
+          <div className="bg-surface rounded-xl p-5 border border-line">
+            <h2 className="text-[10px] font-arcade text-muted tracking-wider mb-3">
+              LEADERBOARD
             </h2>
             <div className="space-y-1">
               {leaderboard.map((entry) => (
                 <div
                   key={entry.rank}
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-700/40"
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-alt/40"
                 >
-                  <span className="w-6 text-right font-mono text-sm text-gray-500">
+                  <span className="w-6 text-right font-mono text-sm text-dim">
                     {entry.rank}
                   </span>
                   <span className="flex-1 text-sm">{entry.displayName}</span>
@@ -150,12 +150,12 @@ export default function SessionHistory() {
 
         {/* Per-question breakdown */}
         <div>
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
-            Question Breakdown
+          <h2 className="text-[10px] font-arcade text-muted tracking-wider mb-3">
+            QUESTION BREAKDOWN
           </h2>
 
           {results.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">No results available.</p>
+            <p className="text-dim text-center py-8">No results available.</p>
           ) : (
             <div className="space-y-4">
               {results.map((r, index) => {
@@ -167,18 +167,18 @@ export default function SessionHistory() {
                 return (
                   <div
                     key={r.id}
-                    className="bg-gray-800 rounded-xl p-5 border border-gray-700"
+                    className="bg-surface rounded-xl p-5 border border-line"
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <span className="text-gray-500 text-xs font-mono mr-2">
+                        <span className="text-dim text-xs font-mono mr-2">
                           Q{index + 1}
                         </span>
                         <span className="text-sm">{r.question}</span>
                       </div>
                       <div className="text-right shrink-0 ml-4">
                         <span className="text-lg font-bold text-green-400">{pctCorrect}%</span>
-                        <p className="text-gray-500 text-xs">{r.total_answered} answered</p>
+                        <p className="text-dim text-xs">{r.total_answered} answered</p>
                       </div>
                     </div>
 
@@ -193,12 +193,12 @@ export default function SessionHistory() {
                           <div key={i} className="flex items-center gap-2 text-sm">
                             <span
                               className={`w-5 font-mono text-xs ${
-                                isCorrect ? 'text-green-400 font-bold' : 'text-gray-500'
+                                isCorrect ? 'text-green-400 font-bold' : 'text-dim'
                               }`}
                             >
                               {String.fromCharCode(65 + i)}
                             </span>
-                            <div className="flex-1 bg-gray-900 rounded-full h-5 overflow-hidden">
+                            <div className="flex-1 bg-bg rounded-full h-5 overflow-hidden">
                               <div
                                 className={`h-full rounded-full transition-all ${
                                   isCorrect ? 'bg-green-600' : 'bg-gray-600'
@@ -206,7 +206,7 @@ export default function SessionHistory() {
                                 style={{ width: `${pct}%` }}
                               />
                             </div>
-                            <span className="w-20 text-right text-xs text-gray-500">
+                            <span className="w-20 text-right text-xs text-dim">
                               {count} ({Math.round(pct)}%)
                             </span>
                           </div>

@@ -47,19 +47,14 @@ export default function LessonBuilder() {
   async function loadLesson() {
     try {
       const res = await fetch(`${API_BASE}/api/lessons/${id}`, { headers: getAuthHeaders() });
-      if (!res.ok) {
-        navigate('/instructor');
-        return;
-      }
+      if (!res.ok) { navigate('/instructor'); return; }
       const data = await res.json();
       setTitle(data.title);
       setTimerSeconds(data.timer_seconds);
       setCheckpoints(
         (data.checkpoints || []).sort((a: Checkpoint, b: Checkpoint) => a.sort_order - b.sort_order)
       );
-    } catch {
-      setError('Failed to load lesson');
-    }
+    } catch { setError('Failed to load lesson'); }
   }
 
   async function loadSessions() {
@@ -71,33 +66,20 @@ export default function LessonBuilder() {
           (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         ));
       }
-    } catch {
-      // Silently handle
-    }
+    } catch {}
   }
 
   async function saveLesson() {
-    setSaving(true);
-    setSaved(false);
-    setError('');
+    setSaving(true); setSaved(false); setError('');
     try {
       const res = await fetch(`${API_BASE}/api/lessons/${id}`, {
-        method: 'PUT',
-        headers: headers(),
+        method: 'PUT', headers: headers(),
         body: JSON.stringify({ title, timer_seconds: timerSeconds }),
       });
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || 'Failed to save lesson');
-      } else {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
-      }
-    } catch {
-      setError('Failed to save lesson');
-    } finally {
-      setSaving(false);
-    }
+      if (!res.ok) { const d = await res.json(); setError(d.error || 'Failed to save'); }
+      else { setSaved(true); setTimeout(() => setSaved(false), 2000); }
+    } catch { setError('Failed to save'); }
+    finally { setSaving(false); }
   }
 
   async function launchSession() {
@@ -105,35 +87,23 @@ export default function LessonBuilder() {
     setLaunching(true);
     try {
       const res = await fetch(`${API_BASE}/api/sessions`, {
-        method: 'POST',
-        headers: headers(),
+        method: 'POST', headers: headers(),
         body: JSON.stringify({ lesson_id: id }),
       });
-
-      if (res.ok) {
-        const data = await res.json();
-        navigate(`/instructor/sessions/${data.sessionId}/lobby`);
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to create session');
-      }
-    } catch {
-      alert('Network error');
-    } finally {
-      setLaunching(false);
-    }
+      if (res.ok) { const d = await res.json(); navigate(`/instructor/sessions/${d.sessionId}/lobby`); }
+      else { const d = await res.json(); alert(d.error || 'Failed'); }
+    } catch { alert('Network error'); }
+    finally { setLaunching(false); }
   }
 
   async function addCheckpoint() {
     try {
       const res = await fetch(`${API_BASE}/api/lessons/${id}/checkpoints`, {
-        method: 'POST',
-        headers: headers(),
+        method: 'POST', headers: headers(),
         body: JSON.stringify({
           question: 'New question',
           options: ['Option A', 'Option B', 'Option C', 'Option D'],
-          correct_index: 0,
-          fact: 'Interesting fact about the answer',
+          correct_index: 0, fact: 'Interesting fact about the answer',
           sort_order: checkpoints.length,
         }),
       });
@@ -142,88 +112,66 @@ export default function LessonBuilder() {
         setCheckpoints(prev => [...prev, cp]);
         setExpandedIndex(checkpoints.length);
       }
-    } catch {
-      setError('Failed to add question');
-    }
+    } catch { setError('Failed to add question'); }
   }
 
   async function updateCheckpoint(cpId: string, updates: Partial<Checkpoint>) {
     try {
       await fetch(`${API_BASE}/api/checkpoints/${cpId}`, {
-        method: 'PUT',
-        headers: headers(),
-        body: JSON.stringify(updates),
+        method: 'PUT', headers: headers(), body: JSON.stringify(updates),
       });
-    } catch {
-      setError('Failed to update question');
-    }
+    } catch { setError('Failed to update question'); }
   }
 
   async function deleteCheckpoint(cpId: string) {
     try {
-      await fetch(`${API_BASE}/api/checkpoints/${cpId}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-      });
+      await fetch(`${API_BASE}/api/checkpoints/${cpId}`, { method: 'DELETE', headers: getAuthHeaders() });
       setCheckpoints(prev => prev.filter(cp => cp.id !== cpId));
-    } catch {
-      setError('Failed to delete question');
-    }
+    } catch { setError('Failed to delete question'); }
   }
 
   async function moveCheckpoint(index: number, direction: 'up' | 'down') {
     const newIndex = direction === 'up' ? index - 1 : index + 1;
     if (newIndex < 0 || newIndex >= checkpoints.length) return;
-
     const updated = [...checkpoints];
     [updated[index], updated[newIndex]] = [updated[newIndex], updated[index]];
     updated.forEach((cp, i) => { cp.sort_order = i; });
     setCheckpoints(updated);
-
     try {
       await fetch(`${API_BASE}/api/checkpoints/reorder`, {
-        method: 'PUT',
-        headers: headers(),
-        body: JSON.stringify({
-          checkpoints: updated.map(cp => ({ id: cp.id, sort_order: cp.sort_order })),
-        }),
+        method: 'PUT', headers: headers(),
+        body: JSON.stringify({ checkpoints: updated.map(cp => ({ id: cp.id, sort_order: cp.sort_order })) }),
       });
-    } catch {
-      setError('Failed to reorder');
-    }
+    } catch { setError('Failed to reorder'); }
   }
 
-  function isCheckpointValid(cp: Checkpoint): boolean {
-    return (
-      cp.question.trim().length > 0 &&
-      cp.options.every(o => o.trim().length > 0) &&
-      cp.options.length === 4 &&
-      cp.correct_index >= 0 &&
-      cp.correct_index <= 3 &&
-      cp.fact.trim().length > 0
-    );
+  function isValid(cp: Checkpoint): boolean {
+    return cp.question.trim().length > 0 && cp.options.every(o => o.trim().length > 0) &&
+      cp.options.length === 4 && cp.correct_index >= 0 && cp.correct_index <= 3 && cp.fact.trim().length > 0;
   }
 
-  const allValid = checkpoints.length > 0 && checkpoints.every(isCheckpointValid);
+  const allValid = checkpoints.length > 0 && checkpoints.every(isValid);
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <header className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex justify-between items-center">
-        <button onClick={() => navigate('/instructor')} className="text-gray-400 hover:text-white text-sm">
+    <div className="min-h-screen bg-bg text-white">
+      <header className="border-b border-line px-6 py-4 flex justify-between items-center">
+        <button onClick={() => navigate('/instructor')} className="text-dim hover:text-white text-xs transition-colors">
           &larr; Back
         </button>
         <div className="flex gap-2">
           <button
             onClick={saveLesson}
             disabled={saving}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${saved ? 'bg-green-500' : 'bg-gray-700 hover:bg-gray-600 disabled:bg-gray-700'}`}
+            className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${
+              saved ? 'bg-success text-white' : 'bg-surface border border-line hover:border-accent/30 disabled:opacity-50'
+            }`}
           >
             {saving ? 'Saving...' : saved ? 'Saved!' : 'Save'}
           </button>
           <button
             onClick={launchSession}
             disabled={!allValid || launching}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:text-gray-500 rounded-lg text-sm font-medium transition-colors"
+            className="px-4 py-2 bg-accent hover:bg-accent-hover disabled:bg-surface disabled:text-dim rounded-lg text-xs font-medium transition-colors shadow-[0_0_15px_rgba(33,33,222,0.2)]"
           >
             {launching ? 'Launching...' : 'Launch Session'}
           </button>
@@ -232,30 +180,27 @@ export default function LessonBuilder() {
 
       <main className="max-w-3xl mx-auto p-6 space-y-6">
         {error && (
-          <div className="bg-red-500/20 border border-red-400 text-red-300 px-4 py-2 rounded-lg text-sm">
+          <div className="bg-danger/10 border border-danger/40 text-danger px-4 py-2 rounded-lg text-xs">
             {error}
           </div>
         )}
 
-        {/* Lesson settings */}
+        {/* Settings */}
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-gray-400 text-xs mb-1">Lesson Title</label>
+            <label className="block text-dim text-xs mb-1">Lesson Title</label>
             <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onBlur={saveLesson}
-              className="w-full px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+              type="text" value={title}
+              onChange={(e) => setTitle(e.target.value)} onBlur={saveLesson}
+              className="w-full px-4 py-3 rounded-lg bg-surface border border-line text-white focus:outline-none focus:border-accent transition-colors"
             />
           </div>
           <div>
-            <label className="block text-gray-400 text-xs mb-1">Timer per question</label>
+            <label className="block text-dim text-xs mb-1">Timer per question</label>
             <select
               value={timerSeconds}
-              onChange={(e) => setTimerSeconds(Number(e.target.value))}
-              onBlur={saveLesson}
-              className="w-full px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+              onChange={(e) => setTimerSeconds(Number(e.target.value))} onBlur={saveLesson}
+              className="w-full px-4 py-3 rounded-lg bg-surface border border-line text-white focus:outline-none focus:border-accent transition-colors"
             >
               <option value={10}>10 seconds</option>
               <option value={15}>15 seconds</option>
@@ -266,61 +211,38 @@ export default function LessonBuilder() {
         </div>
 
         {/* Questions */}
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
-            Questions ({checkpoints.length})
+        <div className="space-y-2">
+          <h3 className="text-[10px] font-arcade text-muted tracking-wider">
+            QUESTIONS ({checkpoints.length})
           </h3>
 
           {checkpoints.map((cp, index) => (
-            <div key={cp.id} className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
+            <div key={cp.id} className="bg-surface border border-line rounded-xl overflow-hidden hover:border-accent/20 transition-colors">
               <div
-                className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-700/50 transition-colors"
+                className="flex items-center justify-between px-4 py-3 cursor-pointer"
                 onClick={() => setExpandedIndex(expandedIndex === index ? null : index)}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className="text-gray-600 font-mono text-xs w-5 text-right shrink-0">
-                    {index + 1}
-                  </span>
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isCheckpointValid(cp) ? 'bg-green-400' : 'bg-yellow-400'}`} />
-                  <span className="text-gray-300 text-sm truncate">{cp.question}</span>
+                  <span className="text-dim font-mono text-xs w-5 text-right shrink-0">{index + 1}</span>
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isValid(cp) ? 'bg-success' : 'bg-gold'}`} />
+                  <span className="text-sm truncate text-muted">{cp.question}</span>
                 </div>
                 <div className="flex items-center gap-1 shrink-0 ml-2">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); moveCheckpoint(index, 'up'); }}
-                    disabled={index === 0}
-                    className="text-gray-600 hover:text-white disabled:opacity-20 p-1"
-                  >
-                    &uarr;
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); moveCheckpoint(index, 'down'); }}
-                    disabled={index === checkpoints.length - 1}
-                    className="text-gray-600 hover:text-white disabled:opacity-20 p-1"
-                  >
-                    &darr;
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); deleteCheckpoint(cp.id); }}
-                    className="text-red-500/60 hover:text-red-400 p-1 text-xs ml-1"
-                  >
-                    Delete
-                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); moveCheckpoint(index, 'up'); }} disabled={index === 0} className="text-dim hover:text-white disabled:opacity-20 p-1 text-xs">&uarr;</button>
+                  <button onClick={(e) => { e.stopPropagation(); moveCheckpoint(index, 'down'); }} disabled={index === checkpoints.length - 1} className="text-dim hover:text-white disabled:opacity-20 p-1 text-xs">&darr;</button>
+                  <button onClick={(e) => { e.stopPropagation(); deleteCheckpoint(cp.id); }} className="text-danger/50 hover:text-danger p-1 text-xs ml-1">Delete</button>
                 </div>
               </div>
 
               {expandedIndex === index && (
-                <div className="px-4 pb-4 space-y-3 border-t border-gray-700 pt-3">
+                <div className="px-4 pb-4 space-y-3 border-t border-line pt-3">
                   <div>
-                    <label className="block text-gray-500 text-xs mb-1">Question</label>
+                    <label className="block text-dim text-xs mb-1">Question</label>
                     <textarea
                       value={cp.question}
-                      onChange={(e) => {
-                        const updated = [...checkpoints];
-                        updated[index] = { ...cp, question: e.target.value };
-                        setCheckpoints(updated);
-                      }}
+                      onChange={(e) => { const u = [...checkpoints]; u[index] = { ...cp, question: e.target.value }; setCheckpoints(u); }}
                       onBlur={() => updateCheckpoint(cp.id, { question: cp.question })}
-                      className="w-full px-3 py-2 rounded bg-gray-700 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      className="w-full px-3 py-2 rounded bg-surface-alt border border-line text-white text-sm focus:outline-none focus:border-accent transition-colors"
                       rows={2}
                     />
                   </div>
@@ -329,15 +251,11 @@ export default function LessonBuilder() {
                     <div key={optIdx} className="flex items-center gap-2">
                       <button
                         onClick={() => {
-                          const updated = [...checkpoints];
-                          updated[index] = { ...cp, correct_index: optIdx };
-                          setCheckpoints(updated);
+                          const u = [...checkpoints]; u[index] = { ...cp, correct_index: optIdx }; setCheckpoints(u);
                           updateCheckpoint(cp.id, { correct_index: optIdx });
                         }}
-                        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 shrink-0 ${
-                          cp.correct_index === optIdx
-                            ? 'bg-green-500 border-green-400 text-white'
-                            : 'border-gray-600 text-gray-500 hover:border-gray-400'
+                        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 shrink-0 transition-colors ${
+                          cp.correct_index === optIdx ? 'bg-success border-success text-white' : 'border-line text-dim hover:border-muted'
                         }`}
                       >
                         {String.fromCharCode(65 + optIdx)}
@@ -345,29 +263,22 @@ export default function LessonBuilder() {
                       <input
                         value={opt}
                         onChange={(e) => {
-                          const updated = [...checkpoints];
-                          const newOpts = [...cp.options];
-                          newOpts[optIdx] = e.target.value;
-                          updated[index] = { ...cp, options: newOpts };
-                          setCheckpoints(updated);
+                          const u = [...checkpoints]; const o = [...cp.options]; o[optIdx] = e.target.value;
+                          u[index] = { ...cp, options: o }; setCheckpoints(u);
                         }}
                         onBlur={() => updateCheckpoint(cp.id, { options: cp.options })}
-                        className="flex-1 px-3 py-2 rounded bg-gray-700 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                        className="flex-1 px-3 py-2 rounded bg-surface-alt border border-line text-white text-sm focus:outline-none focus:border-accent transition-colors"
                       />
                     </div>
                   ))}
 
                   <div>
-                    <label className="block text-gray-500 text-xs mb-1">Fun Fact (shown on wrong answer)</label>
+                    <label className="block text-dim text-xs mb-1">Fun Fact (shown on wrong answer)</label>
                     <textarea
                       value={cp.fact}
-                      onChange={(e) => {
-                        const updated = [...checkpoints];
-                        updated[index] = { ...cp, fact: e.target.value };
-                        setCheckpoints(updated);
-                      }}
+                      onChange={(e) => { const u = [...checkpoints]; u[index] = { ...cp, fact: e.target.value }; setCheckpoints(u); }}
                       onBlur={() => updateCheckpoint(cp.id, { fact: cp.fact })}
-                      className="w-full px-3 py-2 rounded bg-gray-700 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      className="w-full px-3 py-2 rounded bg-surface-alt border border-line text-white text-sm focus:outline-none focus:border-accent transition-colors"
                       rows={2}
                     />
                   </div>
@@ -378,13 +289,13 @@ export default function LessonBuilder() {
 
           <button
             onClick={addCheckpoint}
-            className="w-full py-3 border-2 border-dashed border-gray-700 rounded-xl text-gray-500 hover:text-white hover:border-gray-500 transition-colors text-sm"
+            className="w-full py-3 border-2 border-dashed border-line rounded-xl text-dim hover:text-accent hover:border-accent/30 transition-colors text-xs"
           >
             + Add Question
           </button>
 
           {!allValid && checkpoints.length > 0 && (
-            <p className="text-yellow-400/80 text-xs">
+            <p className="text-gold/80 text-xs">
               All questions need text, 4 options, a correct answer, and a fact before you can launch.
             </p>
           )}
@@ -392,42 +303,31 @@ export default function LessonBuilder() {
 
         {/* Session History */}
         {sessions.length > 0 && (
-          <div className="space-y-3 pt-2">
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
-              Past Sessions ({sessions.length})
+          <div className="space-y-2 pt-2">
+            <h3 className="text-[10px] font-arcade text-muted tracking-wider">
+              PAST SESSIONS ({sessions.length})
             </h3>
-
-            <div className="space-y-2">
-              {sessions.map((s) => (
-                <div
-                  key={s.id}
-                  className="bg-gray-800 rounded-lg px-4 py-3 flex justify-between items-center border border-gray-700 cursor-pointer hover:border-gray-500 transition-colors"
-                  onClick={() => navigate(`/instructor/sessions/${s.id}/results`)}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-sm text-gray-400">{s.join_code}</span>
-                    <span className="text-gray-600 text-xs">
-                      {new Date(s.created_at).toLocaleDateString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs px-2 py-0.5 rounded ${
-                      s.status === 'ended'
-                        ? 'bg-gray-700 text-gray-400'
-                        : s.status === 'running'
-                          ? 'bg-green-900/50 text-green-400'
-                          : 'bg-yellow-900/50 text-yellow-400'
-                    }`}>
-                      {s.status}
-                    </span>
-                    <span className="text-gray-600 text-xs">&rarr;</span>
-                  </div>
+            {sessions.map((s) => (
+              <div
+                key={s.id}
+                className="bg-surface rounded-lg px-4 py-3 flex justify-between items-center border border-line cursor-pointer hover:border-accent/30 transition-colors"
+                onClick={() => navigate(`/instructor/sessions/${s.id}/results`)}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-xs text-muted">{s.join_code}</span>
+                  <span className="text-dim text-xs">
+                    {new Date(s.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                  </span>
                 </div>
-              ))}
-            </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs px-2 py-0.5 rounded ${
+                    s.status === 'ended' ? 'bg-surface-alt text-dim' :
+                    s.status === 'running' ? 'bg-success/10 text-success' : 'bg-gold/10 text-gold'
+                  }`}>{s.status}</span>
+                  <span className="text-dim text-xs">&rarr;</span>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </main>

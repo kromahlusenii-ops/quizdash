@@ -37,7 +37,6 @@ export default function Dashboard() {
   async function loadData() {
     try {
       const headers = getAuthHeaders();
-
       const [lessonsRes, sessionsRes] = await Promise.all([
         fetch(`${API_BASE}/api/lessons`, { headers }),
         fetch(`${API_BASE}/api/sessions`, { headers }),
@@ -95,29 +94,27 @@ export default function Dashboard() {
     navigate('/instructor/login');
   }
 
-  // Check for any live/lobby session
   const activeSession = sessions.find(
     (s) => s.status === 'lobby' || s.status === 'running'
   );
 
-  // Count sessions per lesson
   function sessionCountFor(lessonId: string) {
     return sessions.filter((s) => s.lesson_id === lessonId).length;
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <p className="text-white text-xl">Loading...</p>
+      <div className="min-h-screen bg-bg flex items-center justify-center">
+        <p className="text-muted font-arcade text-xs">LOADING...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <header className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold tracking-tight">QuizDash</h1>
-        <button onClick={handleLogout} className="text-gray-400 hover:text-white text-sm">
+    <div className="min-h-screen bg-bg text-white">
+      <header className="border-b border-line px-6 py-4 flex justify-between items-center">
+        <h1 className="font-arcade text-sm text-accent">QUIZDASH</h1>
+        <button onClick={handleLogout} className="text-dim hover:text-white text-xs transition-colors">
           Sign Out
         </button>
       </header>
@@ -126,7 +123,7 @@ export default function Dashboard() {
         {/* Active session banner */}
         {activeSession && (
           <div
-            className="bg-green-900/30 border border-green-700 rounded-xl p-4 flex items-center justify-between cursor-pointer hover:border-green-500 transition-colors"
+            className="border border-success/40 bg-success/5 rounded-xl p-4 flex items-center justify-between cursor-pointer hover:border-success/70 transition-colors"
             onClick={() =>
               navigate(
                 activeSession.status === 'lobby'
@@ -136,68 +133,70 @@ export default function Dashboard() {
             }
           >
             <div className="flex items-center gap-3">
-              <span className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse" />
+              <span className="w-2.5 h-2.5 rounded-full bg-success animate-pulse" />
               <div>
-                <p className="font-medium text-green-200">
-                  Live session — {activeSession.join_code}
+                <p className="font-medium text-success">
+                  Live session — <span className="font-mono">{activeSession.join_code}</span>
                 </p>
-                <p className="text-green-400/70 text-xs">
+                <p className="text-success/50 text-xs">
                   {activeSession.status === 'lobby' ? 'Waiting for players' : 'In progress'}
                 </p>
               </div>
             </div>
-            <span className="text-green-300 text-sm font-medium">Rejoin &rarr;</span>
+            <span className="text-success text-sm font-medium">&rarr;</span>
           </div>
         )}
 
         {/* Lessons */}
         <div>
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-gray-300">Your Lessons</h2>
+            <h2 className="text-xs font-arcade text-muted tracking-wider">YOUR LESSONS</h2>
             <button
               onClick={createLesson}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
+              className="px-4 py-2 bg-accent hover:bg-accent-hover rounded-lg text-xs font-medium transition-colors shadow-[0_0_15px_rgba(33,33,222,0.2)]"
             >
               + New Lesson
             </button>
           </div>
 
           {lessons.length === 0 ? (
-            <div className="text-center py-16">
-              <p className="text-gray-500 mb-4">No lessons yet.</p>
+            <div className="text-center py-16 border border-line rounded-xl">
+              <p className="text-dim mb-4 text-sm">No lessons yet.</p>
               <button
                 onClick={createLesson}
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors"
+                className="px-6 py-3 bg-accent hover:bg-accent-hover rounded-lg font-medium transition-colors text-sm"
               >
                 Create your first lesson
               </button>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {lessons.map((lesson) => {
                 const count = sessionCountFor(lesson.id);
                 return (
                   <div
                     key={lesson.id}
-                    className="bg-gray-800 rounded-xl p-4 border border-gray-700 cursor-pointer hover:border-gray-500 transition-colors"
+                    className="bg-surface rounded-xl px-5 py-4 border border-line cursor-pointer hover:border-accent/30 transition-all group"
                     onClick={() => navigate(`/instructor/lessons/${lesson.id}`)}
                   >
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="font-semibold text-base">{lesson.title}</h3>
-                        <p className="text-gray-500 text-sm mt-0.5">
+                        <h3 className="font-semibold text-sm group-hover:text-accent transition-colors">
+                          {lesson.title}
+                        </h3>
+                        <p className="text-dim text-xs mt-0.5">
                           {lesson.checkpoint_count || 0} questions
-                          <span className="mx-1.5 text-gray-700">/</span>
-                          {lesson.timer_seconds}s timer
+                          <span className="mx-1.5 text-line">/</span>
+                          {lesson.timer_seconds}s
                           {count > 0 && (
                             <>
-                              <span className="mx-1.5 text-gray-700">/</span>
-                              {count} session{count !== 1 ? 's' : ''} run
+                              <span className="mx-1.5 text-line">/</span>
+                              {count} run{count !== 1 ? 's' : ''}
                             </>
                           )}
                         </p>
                       </div>
-                      <span className="text-gray-600 text-sm">&rarr;</span>
+                      <span className="text-dim group-hover:text-accent transition-colors">&rarr;</span>
                     </div>
                   </div>
                 );

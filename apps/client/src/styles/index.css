@@ -9,3 +9,33 @@
   font-style: normal;
   font-display: swap;
 }
+
+:root {
+  --bg: #000000;
+  --surface: #0a0a0a;
+  --surface-alt: #111111;
+  --border: #1a1a1a;
+  --border-accent: #2121de;
+  --text: #ffffff;
+  --text-muted: #888888;
+  --text-dim: #555555;
+  --accent: #2121de;
+  --accent-hover: #3333ff;
+  --accent-glow: rgba(33, 33, 222, 0.3);
+  --success: #2ecc71;
+  --danger: #ff4444;
+  --gold: #ffaa00;
+  --font-arcade: 'Press Start 2P', 'Courier New', monospace;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Shared arcade border for page containers */
+.arcade-border {
+  border: 2px solid var(--border-accent);
+  box-shadow: 0 0 30px var(--accent-glow), inset 0 0 30px rgba(33, 33, 222, 0.03);
+}
