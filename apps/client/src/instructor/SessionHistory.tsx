@@ -4,21 +4,38 @@ import { getToken, getAuthHeaders } from '../lib/supabase';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
-interface CheckpointResult {
+interface QuestionResult {
   id: string;
-  checkpoint_id: string;
-  answer_distribution: Record<number, number>;
-  total_answered: number;
-  total_correct: number;
   question: string;
   options: string[];
   correct_index: number;
+  answer_distribution: Record<number, number>;
+  total_answered: number;
+  total_correct: number;
+}
+
+interface LeaderboardEntry {
+  rank: number;
+  displayName: string;
+  score: number;
+  lives: number;
+  survived: boolean;
+}
+
+interface SessionMeta {
+  id: string;
+  status: string;
+  createdAt: string;
+  totalQuestions: number;
+  totalPlayers: number;
 }
 
 export default function SessionHistory() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [results, setResults] = useState<CheckpointResult[]>([]);
+  const [session, setSession] = useState<SessionMeta | null>(null);
+  const [results, setResults] = useState<QuestionResult[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -37,7 +54,9 @@ export default function SessionHistory() {
 
       if (res.ok) {
         const data = await res.json();
+        setSession(data.session || null);
         setResults(data.results || []);
+        setLeaderboard(data.leaderboard || []);
       }
     } catch {
       // Handle error
@@ -54,66 +73,152 @@ export default function SessionHistory() {
     );
   }
 
+  const overallCorrect = results.reduce((s, r) => s + r.total_correct, 0);
+  const overallTotal = results.reduce((s, r) => s + r.total_answered, 0);
+  const overallPct = overallTotal > 0 ? Math.round((overallCorrect / overallTotal) * 100) : 0;
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <header className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex justify-between items-center">
-        <button onClick={() => navigate('/instructor')} className="text-gray-400 hover:text-white">
-          &larr; Back to Dashboard
+        <button onClick={() => navigate('/instructor')} className="text-gray-400 hover:text-white text-sm">
+          &larr; Back
         </button>
-        <h1 className="text-xl font-bold">Session Results</h1>
+        <h1 className="text-base font-semibold">Session Results</h1>
       </header>
 
       <main className="max-w-4xl mx-auto p-6 space-y-6">
-        {results.length === 0 ? (
-          <p className="text-gray-400 text-center py-12">No results available for this session.</p>
-        ) : (
-          results.map((r, index) => (
-            <div key={r.id} className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-              <h3 className="font-semibold mb-1">Question #{index + 1}</h3>
-              <p className="text-gray-300 mb-4">{r.question}</p>
-
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="bg-gray-700 rounded-lg p-3 text-center">
-                  <p className="text-2xl font-bold">{r.total_answered}</p>
-                  <p className="text-gray-400 text-sm">Total Answered</p>
-                </div>
-                <div className="bg-gray-700 rounded-lg p-3 text-center">
-                  <p className="text-2xl font-bold text-green-400">
-                    {r.total_answered > 0
-                      ? Math.round((r.total_correct / r.total_answered) * 100)
-                      : 0}%
-                  </p>
-                  <p className="text-gray-400 text-sm">Correct</p>
-                </div>
+        {/* Summary bar */}
+        {session && (
+          <div className="flex flex-wrap gap-4">
+            {[
+              { label: 'Players', value: session.totalPlayers },
+              { label: 'Questions', value: session.totalQuestions },
+              { label: 'Overall accuracy', value: `${overallPct}%` },
+              {
+                label: 'Date',
+                value: new Date(session.createdAt).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                }),
+              },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className="bg-gray-800 rounded-lg px-4 py-3 border border-gray-700 flex-1 min-w-[120px]"
+              >
+                <p className="text-2xl font-bold">{stat.value}</p>
+                <p className="text-gray-500 text-xs">{stat.label}</p>
               </div>
-
-              <div className="space-y-2">
-                {r.options?.map((opt: string, i: number) => {
-                  const count = r.answer_distribution[i] || 0;
-                  const pct = r.total_answered > 0 ? (count / r.total_answered) * 100 : 0;
-                  const isCorrect = i === r.correct_index;
-
-                  return (
-                    <div key={i} className="flex items-center gap-3">
-                      <span className={`w-6 font-mono ${isCorrect ? 'text-green-400' : ''}`}>
-                        {String.fromCharCode(65 + i)}
-                      </span>
-                      <div className="flex-1 bg-gray-700 rounded-full h-5 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${isCorrect ? 'bg-green-500' : 'bg-blue-500'}`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <span className="w-16 text-right text-sm text-gray-400">
-                        {count} ({Math.round(pct)}%)
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
+
+        {/* Leaderboard */}
+        {leaderboard.length > 0 && (
+          <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
+            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+              Leaderboard
+            </h2>
+            <div className="space-y-1">
+              {leaderboard.map((entry) => (
+                <div
+                  key={entry.rank}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-700/40"
+                >
+                  <span className="w-6 text-right font-mono text-sm text-gray-500">
+                    {entry.rank}
+                  </span>
+                  <span className="flex-1 text-sm">{entry.displayName}</span>
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded ${
+                      entry.survived
+                        ? 'bg-green-900/40 text-green-400'
+                        : 'bg-red-900/40 text-red-400'
+                    }`}
+                  >
+                    {entry.survived ? 'Survived' : 'Out'}
+                  </span>
+                  <span className="font-mono text-sm text-yellow-400 w-16 text-right">
+                    {entry.score}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Per-question breakdown */}
+        <div>
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+            Question Breakdown
+          </h2>
+
+          {results.length === 0 ? (
+            <p className="text-gray-500 text-center py-8">No results available.</p>
+          ) : (
+            <div className="space-y-4">
+              {results.map((r, index) => {
+                const pctCorrect =
+                  r.total_answered > 0
+                    ? Math.round((r.total_correct / r.total_answered) * 100)
+                    : 0;
+
+                return (
+                  <div
+                    key={r.id}
+                    className="bg-gray-800 rounded-xl p-5 border border-gray-700"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <span className="text-gray-500 text-xs font-mono mr-2">
+                          Q{index + 1}
+                        </span>
+                        <span className="text-sm">{r.question}</span>
+                      </div>
+                      <div className="text-right shrink-0 ml-4">
+                        <span className="text-lg font-bold text-green-400">{pctCorrect}%</span>
+                        <p className="text-gray-500 text-xs">{r.total_answered} answered</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      {r.options?.map((opt: string, i: number) => {
+                        const count = r.answer_distribution[i] || 0;
+                        const pct =
+                          r.total_answered > 0 ? (count / r.total_answered) * 100 : 0;
+                        const isCorrect = i === r.correct_index;
+
+                        return (
+                          <div key={i} className="flex items-center gap-2 text-sm">
+                            <span
+                              className={`w-5 font-mono text-xs ${
+                                isCorrect ? 'text-green-400 font-bold' : 'text-gray-500'
+                              }`}
+                            >
+                              {String.fromCharCode(65 + i)}
+                            </span>
+                            <div className="flex-1 bg-gray-900 rounded-full h-5 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${
+                                  isCorrect ? 'bg-green-600' : 'bg-gray-600'
+                                }`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="w-20 text-right text-xs text-gray-500">
+                              {count} ({Math.round(pct)}%)
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );

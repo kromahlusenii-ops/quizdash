@@ -11,12 +11,11 @@ interface LeaderboardEntry {
 }
 
 /**
- * End a session: build checkpoint results, final leaderboard, set status='ended'.
+ * End a session: persist checkpoint results, build leaderboard, set status='ended'.
  * Uses a WHERE status='running' guard so only one caller wins in a race.
  * Returns null if the session was already ended.
  */
 export async function endSession(sessionId: string): Promise<LeaderboardEntry[] | null> {
-  // Conditional update — only succeeds if still running
   const { data: updated, error: updateError } = await supabase
     .from('sessions')
     .update({ status: 'ended', ended_at: new Date().toISOString() })
@@ -26,26 +25,25 @@ export async function endSession(sessionId: string): Promise<LeaderboardEntry[] 
     .single();
 
   if (updateError || !updated) {
-    // Already ended (instructor or another auto-end won the race)
     return null;
   }
 
   const lessonId = updated.lesson_id;
 
-  // Build session_checkpoint_results
+  // Persist aggregate results per question into session_checkpoint_results.
+  // The table FK is checkpoint_id (UUID), not checkpoint_index.
   const { data: checkpoints } = await supabase
     .from('checkpoints')
-    .select('sort_order')
+    .select('id, sort_order')
     .eq('lesson_id', lessonId)
     .order('sort_order', { ascending: true });
 
   for (const cp of checkpoints ?? []) {
-    const idx = cp.sort_order;
     const { data: cpAnswers } = await supabase
       .from('session_answers')
       .select('selected_index, correct')
       .eq('session_id', sessionId)
-      .eq('checkpoint_index', idx);
+      .eq('checkpoint_index', cp.sort_order);
 
     const distribution: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
     let totalAnswered = 0;
@@ -59,13 +57,15 @@ export async function endSession(sessionId: string): Promise<LeaderboardEntry[] 
       if (a.correct) totalCorrect++;
     }
 
-    await supabase.from('session_checkpoint_results').upsert({
+    // Insert using the correct checkpoint_id FK. Ignore duplicates if session
+    // was somehow double-ended (the status guard above prevents this, but belt+suspenders).
+    await supabase.from('session_checkpoint_results').insert({
       session_id: sessionId,
-      checkpoint_index: idx,
+      checkpoint_id: cp.id,
       answer_distribution: distribution,
       total_answered: totalAnswered,
       total_correct: totalCorrect,
-    }, { onConflict: 'session_id,checkpoint_index' });
+    });
   }
 
   // Build final leaderboard

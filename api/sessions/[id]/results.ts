@@ -12,7 +12,7 @@ async function getUserId(req: VercelRequest): Promise<string | null> {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
 
@@ -28,10 +28,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { id: sessionId } = req.query;
 
   try {
-    // Get session and verify instructor
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
-      .select('*')
+      .select('id, status, lesson_id, created_at')
       .eq('id', sessionId)
       .eq('instructor_id', userId)
       .single();
@@ -40,31 +39,74 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ error: 'Session not found' });
     }
 
-    // Get checkpoint results with joined checkpoint data
-    const { data: results, error: resultsError } = await supabase
-      .from('session_checkpoint_results')
-      .select('*')
-      .eq('session_id', sessionId)
-      .order('checkpoint_index', { ascending: true });
-
-    if (resultsError) return res.status(400).json({ error: resultsError.message });
-
-    // Get checkpoint details for each result
+    // Get questions for the lesson
     const { data: checkpoints } = await supabase
       .from('checkpoints')
-      .select('*')
+      .select('id, sort_order, question, options, correct_index')
       .eq('lesson_id', session.lesson_id)
       .order('sort_order', { ascending: true });
 
-    const enrichedResults = (results ?? []).map((r: any) => {
-      const cp = (checkpoints ?? []).find((c: any) => c.sort_order === r.checkpoint_index);
+    // Get all answers for this session
+    const { data: answers } = await supabase
+      .from('session_answers')
+      .select('checkpoint_index, selected_index, correct')
+      .eq('session_id', sessionId);
+
+    // Build per-question results (from source-of-truth tables, not the cache)
+    const results = (checkpoints ?? []).map((cp: any) => {
+      const qAnswers = (answers ?? []).filter(
+        (a: any) => a.checkpoint_index === cp.sort_order
+      );
+
+      const distribution: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
+      let totalAnswered = 0;
+      let totalCorrect = 0;
+
+      for (const a of qAnswers) {
+        if (a.selected_index >= 0 && a.selected_index <= 3) {
+          distribution[a.selected_index]++;
+        }
+        totalAnswered++;
+        if (a.correct) totalCorrect++;
+      }
+
       return {
-        ...r,
-        checkpoint: cp ?? null,
+        id: cp.id,
+        question: cp.question,
+        options: cp.options,
+        correct_index: cp.correct_index,
+        answer_distribution: distribution,
+        total_answered: totalAnswered,
+        total_correct: totalCorrect,
       };
     });
 
-    return res.status(200).json({ session, results: enrichedResults });
+    // Build leaderboard
+    const { data: players } = await supabase
+      .from('session_players')
+      .select('id, display_name, score, lives, status')
+      .eq('session_id', sessionId)
+      .order('score', { ascending: false });
+
+    const leaderboard = (players ?? []).map((p: any, i: number) => ({
+      rank: i + 1,
+      displayName: p.display_name,
+      score: p.score,
+      lives: p.lives,
+      survived: p.status === 'alive' || p.status === 'completed',
+    }));
+
+    return res.status(200).json({
+      session: {
+        id: session.id,
+        status: session.status,
+        createdAt: session.created_at,
+        totalQuestions: checkpoints?.length ?? 0,
+        totalPlayers: players?.length ?? 0,
+      },
+      results,
+      leaderboard,
+    });
   } catch (err: any) {
     return res.status(500).json({ error: err.message || 'Internal server error' });
   }
