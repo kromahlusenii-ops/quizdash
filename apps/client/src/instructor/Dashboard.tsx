@@ -116,7 +116,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <header className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold tracking-tight">Financial Wellness</h1>
+        <h1 className="text-xl font-bold tracking-tight">QuizDash</h1>
         <button onClick={handleLogout} className="text-gray-400 hover:text-white text-sm">
           Sign Out
         </button>

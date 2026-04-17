@@ -91,16 +91,14 @@ export default function Landing() {
         <h1
           style={{
             fontFamily: "'Press Start 2P', 'Courier New', monospace",
-            fontSize: 'clamp(18px, 4vw, 28px)',
+            fontSize: 'clamp(22px, 5vw, 36px)',
             color: '#fff',
             lineHeight: 1.4,
             marginBottom: '6px',
             textShadow: '0 0 30px rgba(255,255,0,0.2)',
           }}
         >
-          FINANCIAL
-          <br />
-          WELLNESS
+          QUIZDASH
         </h1>
 
         <p
@@ -113,7 +111,7 @@ export default function Landing() {
             textTransform: 'uppercase',
           }}
         >
-          Quiz Game
+          Learn by playing
         </p>
 
         <div
@@ -134,7 +132,7 @@ export default function Landing() {
               marginBottom: '24px',
             }}
           >
-            {['Build quiz lessons', 'Students play Pac-Man', 'Real-time leaderboards'].map(
+            {['Build quiz lessons', 'Students play to learn', 'Live leaderboards'].map(
               (text) => (
                 <span
                   key={text}
@@ -183,7 +181,7 @@ export default function Landing() {
           </button>
 
           <p style={{ fontSize: '11px', color: '#555', marginTop: '8px' }}>
-            Create lessons, share a code, watch students play.
+            Create quizzes, share a code, watch students compete.
           </p>
         </div>
       </div>
