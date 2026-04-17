@@ -157,7 +157,7 @@ export default function Dashboard() {
                 <div key={lesson.id} className="bg-gray-800 rounded-xl p-4 border border-gray-700">
                   <h3 className="font-semibold text-lg mb-1">{lesson.title}</h3>
                   <p className="text-gray-400 text-sm mb-3">
-                    {lesson.checkpoint_count || 0} checkpoints | {lesson.timer_seconds}s timer
+                    {lesson.checkpoint_count || 0} questions | {lesson.timer_seconds}s timer
                   </p>
                   <div className="flex gap-2">
                     <button

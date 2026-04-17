@@ -69,7 +69,7 @@ export default function SessionHistory() {
         ) : (
           results.map((r, index) => (
             <div key={r.id} className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-              <h3 className="font-semibold mb-1">Checkpoint #{index + 1}</h3>
+              <h3 className="font-semibold mb-1">Question #{index + 1}</h3>
               <p className="text-gray-300 mb-4">{r.question}</p>
 
               <div className="grid grid-cols-2 gap-4 mb-4">

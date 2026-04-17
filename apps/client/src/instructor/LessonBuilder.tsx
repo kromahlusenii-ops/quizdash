@@ -210,7 +210,7 @@ export default function LessonBuilder() {
         </div>
 
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Checkpoints ({checkpoints.length})</h3>
+          <h3 className="text-lg font-semibold">Questions ({checkpoints.length})</h3>
 
           {checkpoints.map((cp, index) => (
             <div key={cp.id} className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
@@ -321,13 +321,13 @@ export default function LessonBuilder() {
             onClick={addCheckpoint}
             className="w-full py-3 border-2 border-dashed border-gray-600 rounded-xl text-gray-400 hover:text-white hover:border-gray-400 transition-colors"
           >
-            + Add Checkpoint
+            + Add Question
           </button>
         </div>
 
         {!allValid && checkpoints.length > 0 && (
           <p className="text-yellow-400 text-sm">
-            All checkpoints must have a question, 4 options, a correct answer, and a fact before launching.
+            All questions must have text, 4 options, a correct answer, and a fact before launching.
           </p>
         )}
       </main>
