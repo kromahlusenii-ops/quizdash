@@ -13,6 +13,14 @@ interface Checkpoint {
   fact: string;
 }
 
+interface Session {
+  id: string;
+  join_code: string;
+  status: string;
+  lesson_id: string;
+  created_at: string;
+}
+
 export default function LessonBuilder() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -23,6 +31,8 @@ export default function LessonBuilder() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [launching, setLaunching] = useState(false);
 
   const headers = useCallback(() => ({
     'Content-Type': 'application/json',
@@ -31,6 +41,7 @@ export default function LessonBuilder() {
 
   useEffect(() => {
     loadLesson();
+    loadSessions();
   }, [id]);
 
   async function loadLesson() {
@@ -48,6 +59,20 @@ export default function LessonBuilder() {
       );
     } catch {
       setError('Failed to load lesson');
+    }
+  }
+
+  async function loadSessions() {
+    try {
+      const res = await fetch(`${API_BASE}/api/sessions`, { headers: getAuthHeaders() });
+      if (res.ok) {
+        const all: Session[] = await res.json();
+        setSessions(all.filter((s) => s.lesson_id === id).sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        ));
+      }
+    } catch {
+      // Silently handle
     }
   }
 
@@ -75,6 +100,30 @@ export default function LessonBuilder() {
     }
   }
 
+  async function launchSession() {
+    if (!allValid) return;
+    setLaunching(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/sessions`, {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({ lesson_id: id }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        navigate(`/instructor/sessions/${data.sessionId}/lobby`);
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to create session');
+      }
+    } catch {
+      alert('Network error');
+    } finally {
+      setLaunching(false);
+    }
+  }
+
   async function addCheckpoint() {
     try {
       const res = await fetch(`${API_BASE}/api/lessons/${id}/checkpoints`, {
@@ -94,7 +143,7 @@ export default function LessonBuilder() {
         setExpandedIndex(checkpoints.length);
       }
     } catch {
-      setError('Failed to add checkpoint');
+      setError('Failed to add question');
     }
   }
 
@@ -106,7 +155,7 @@ export default function LessonBuilder() {
         body: JSON.stringify(updates),
       });
     } catch {
-      setError('Failed to update checkpoint');
+      setError('Failed to update question');
     }
   }
 
@@ -118,7 +167,7 @@ export default function LessonBuilder() {
       });
       setCheckpoints(prev => prev.filter(cp => cp.id !== cpId));
     } catch {
-      setError('Failed to delete checkpoint');
+      setError('Failed to delete question');
     }
   }
 
@@ -160,16 +209,25 @@ export default function LessonBuilder() {
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <header className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex justify-between items-center">
-        <button onClick={() => navigate('/instructor')} className="text-gray-400 hover:text-white">
+        <button onClick={() => navigate('/instructor')} className="text-gray-400 hover:text-white text-sm">
           &larr; Back
         </button>
-        <button
-          onClick={saveLesson}
-          disabled={saving}
-          className={`px-4 py-2 rounded-lg font-medium ${saved ? 'bg-green-500' : 'bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600'}`}
-        >
-          {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Lesson'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={saveLesson}
+            disabled={saving}
+            className={`px-4 py-2 rounded-lg text-sm font-medium ${saved ? 'bg-green-500' : 'bg-gray-700 hover:bg-gray-600 disabled:bg-gray-700'}`}
+          >
+            {saving ? 'Saving...' : saved ? 'Saved!' : 'Save'}
+          </button>
+          <button
+            onClick={launchSession}
+            disabled={!allValid || launching}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:text-gray-500 rounded-lg text-sm font-medium transition-colors"
+          >
+            {launching ? 'Launching...' : 'Launch Session'}
+          </button>
+        </div>
       </header>
 
       <main className="max-w-3xl mx-auto p-6 space-y-6">
@@ -179,9 +237,10 @@ export default function LessonBuilder() {
           </div>
         )}
 
-        <div className="space-y-4">
+        {/* Lesson settings */}
+        <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-gray-300 text-sm mb-1">Lesson Title</label>
+            <label className="block text-gray-400 text-xs mb-1">Lesson Title</label>
             <input
               type="text"
               value={title}
@@ -190,16 +249,13 @@ export default function LessonBuilder() {
               className="w-full px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
           </div>
-
           <div>
-            <label className="block text-gray-300 text-sm mb-1">Timer (seconds)</label>
+            <label className="block text-gray-400 text-xs mb-1">Timer per question</label>
             <select
               value={timerSeconds}
-              onChange={(e) => {
-                setTimerSeconds(Number(e.target.value));
-              }}
+              onChange={(e) => setTimerSeconds(Number(e.target.value))}
               onBlur={saveLesson}
-              className="px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
               <option value={10}>10 seconds</option>
               <option value={15}>15 seconds</option>
@@ -209,40 +265,43 @@ export default function LessonBuilder() {
           </div>
         </div>
 
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Questions ({checkpoints.length})</h3>
+        {/* Questions */}
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+            Questions ({checkpoints.length})
+          </h3>
 
           {checkpoints.map((cp, index) => (
             <div key={cp.id} className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
               <div
-                className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-700"
+                className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-700/50 transition-colors"
                 onClick={() => setExpandedIndex(expandedIndex === index ? null : index)}
               >
-                <div className="flex items-center gap-3">
-                  <span className="text-gray-500 font-mono text-sm">#{index + 1}</span>
-                  <span className={`text-sm ${isCheckpointValid(cp) ? 'text-green-400' : 'text-yellow-400'}`}>
-                    {isCheckpointValid(cp) ? 'Valid' : 'Incomplete'}
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-gray-600 font-mono text-xs w-5 text-right shrink-0">
+                    {index + 1}
                   </span>
-                  <span className="text-gray-300 truncate max-w-xs">{cp.question}</span>
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isCheckpointValid(cp) ? 'bg-green-400' : 'bg-yellow-400'}`} />
+                  <span className="text-gray-300 text-sm truncate">{cp.question}</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 shrink-0 ml-2">
                   <button
                     onClick={(e) => { e.stopPropagation(); moveCheckpoint(index, 'up'); }}
                     disabled={index === 0}
-                    className="text-gray-500 hover:text-white disabled:opacity-30 px-1"
+                    className="text-gray-600 hover:text-white disabled:opacity-20 p-1"
                   >
                     &uarr;
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); moveCheckpoint(index, 'down'); }}
                     disabled={index === checkpoints.length - 1}
-                    className="text-gray-500 hover:text-white disabled:opacity-30 px-1"
+                    className="text-gray-600 hover:text-white disabled:opacity-20 p-1"
                   >
                     &darr;
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); deleteCheckpoint(cp.id); }}
-                    className="text-red-400 hover:text-red-300 px-1 text-sm"
+                    className="text-red-500/60 hover:text-red-400 p-1 text-xs ml-1"
                   >
                     Delete
                   </button>
@@ -252,7 +311,7 @@ export default function LessonBuilder() {
               {expandedIndex === index && (
                 <div className="px-4 pb-4 space-y-3 border-t border-gray-700 pt-3">
                   <div>
-                    <label className="block text-gray-400 text-xs mb-1">Question</label>
+                    <label className="block text-gray-500 text-xs mb-1">Question</label>
                     <textarea
                       value={cp.question}
                       onChange={(e) => {
@@ -275,10 +334,10 @@ export default function LessonBuilder() {
                           setCheckpoints(updated);
                           updateCheckpoint(cp.id, { correct_index: optIdx });
                         }}
-                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 ${
+                        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 shrink-0 ${
                           cp.correct_index === optIdx
                             ? 'bg-green-500 border-green-400 text-white'
-                            : 'border-gray-600 text-gray-400 hover:border-gray-400'
+                            : 'border-gray-600 text-gray-500 hover:border-gray-400'
                         }`}
                       >
                         {String.fromCharCode(65 + optIdx)}
@@ -299,7 +358,7 @@ export default function LessonBuilder() {
                   ))}
 
                   <div>
-                    <label className="block text-gray-400 text-xs mb-1">Fun Fact (shown after elimination)</label>
+                    <label className="block text-gray-500 text-xs mb-1">Fun Fact (shown on wrong answer)</label>
                     <textarea
                       value={cp.fact}
                       onChange={(e) => {
@@ -319,16 +378,57 @@ export default function LessonBuilder() {
 
           <button
             onClick={addCheckpoint}
-            className="w-full py-3 border-2 border-dashed border-gray-600 rounded-xl text-gray-400 hover:text-white hover:border-gray-400 transition-colors"
+            className="w-full py-3 border-2 border-dashed border-gray-700 rounded-xl text-gray-500 hover:text-white hover:border-gray-500 transition-colors text-sm"
           >
             + Add Question
           </button>
+
+          {!allValid && checkpoints.length > 0 && (
+            <p className="text-yellow-400/80 text-xs">
+              All questions need text, 4 options, a correct answer, and a fact before you can launch.
+            </p>
+          )}
         </div>
 
-        {!allValid && checkpoints.length > 0 && (
-          <p className="text-yellow-400 text-sm">
-            All questions must have text, 4 options, a correct answer, and a fact before launching.
-          </p>
+        {/* Session History */}
+        {sessions.length > 0 && (
+          <div className="space-y-3 pt-2">
+            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+              Past Sessions ({sessions.length})
+            </h3>
+
+            <div className="space-y-2">
+              {sessions.map((s) => (
+                <div
+                  key={s.id}
+                  className="bg-gray-800 rounded-lg px-4 py-3 flex justify-between items-center border border-gray-700 cursor-pointer hover:border-gray-500 transition-colors"
+                  onClick={() => navigate(`/instructor/sessions/${s.id}/results`)}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-sm text-gray-400">{s.join_code}</span>
+                    <span className="text-gray-600 text-xs">
+                      {new Date(s.created_at).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs px-2 py-0.5 rounded ${
+                      s.status === 'ended'
+                        ? 'bg-gray-700 text-gray-400'
+                        : s.status === 'running'
+                          ? 'bg-green-900/50 text-green-400'
+                          : 'bg-yellow-900/50 text-yellow-400'
+                    }`}>
+                      {s.status}
+                    </span>
+                    <span className="text-gray-600 text-xs">&rarr;</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </main>
     </div>

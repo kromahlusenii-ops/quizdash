@@ -16,6 +16,7 @@ interface Session {
   id: string;
   join_code: string;
   status: string;
+  lesson_id: string;
   created_at: string;
 }
 
@@ -57,7 +58,7 @@ export default function Dashboard() {
       }
       if (sessionsRes.ok) setSessions(await sessionsRes.json());
     } catch {
-      // Handle error silently
+      // Silently handle
     } finally {
       setLoading(false);
     }
@@ -89,35 +90,19 @@ export default function Dashboard() {
     }
   }
 
-  async function createSession(lessonId: string) {
-    try {
-      const res = await fetch(`${API_BASE}/api/sessions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({ lesson_id: lessonId }),
-      });
-
-      if (res.status === 401) {
-        signOut();
-        navigate('/instructor/login');
-        return;
-      }
-
-      if (res.ok) {
-        const data = await res.json();
-        navigate(`/instructor/sessions/${data.sessionId}/lobby`);
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to create session');
-      }
-    } catch {
-      alert('Network error — please try again');
-    }
-  }
-
   function handleLogout() {
     signOut();
     navigate('/instructor/login');
+  }
+
+  // Check for any live/lobby session
+  const activeSession = sessions.find(
+    (s) => s.status === 'lobby' || s.status === 'running'
+  );
+
+  // Count sessions per lesson
+  function sessionCountFor(lessonId: string) {
+    return sessions.filter((s) => s.lesson_id === lessonId).length;
   }
 
   if (loading) {
@@ -131,82 +116,95 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <header className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Instructor Dashboard</h1>
+        <h1 className="text-xl font-bold tracking-tight">Financial Wellness</h1>
         <button onClick={handleLogout} className="text-gray-400 hover:text-white text-sm">
           Sign Out
         </button>
       </header>
 
-      <main className="max-w-6xl mx-auto p-6 space-y-8">
-        <section>
+      <main className="max-w-4xl mx-auto p-6 space-y-6">
+        {/* Active session banner */}
+        {activeSession && (
+          <div
+            className="bg-green-900/30 border border-green-700 rounded-xl p-4 flex items-center justify-between cursor-pointer hover:border-green-500 transition-colors"
+            onClick={() =>
+              navigate(
+                activeSession.status === 'lobby'
+                  ? `/instructor/sessions/${activeSession.id}/lobby`
+                  : `/instructor/sessions/${activeSession.id}/live`
+              )
+            }
+          >
+            <div className="flex items-center gap-3">
+              <span className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse" />
+              <div>
+                <p className="font-medium text-green-200">
+                  Live session — {activeSession.join_code}
+                </p>
+                <p className="text-green-400/70 text-xs">
+                  {activeSession.status === 'lobby' ? 'Waiting for players' : 'In progress'}
+                </p>
+              </div>
+            </div>
+            <span className="text-green-300 text-sm font-medium">Rejoin &rarr;</span>
+          </div>
+        )}
+
+        {/* Lessons */}
+        <div>
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Lessons</h2>
+            <h2 className="text-lg font-semibold text-gray-300">Your Lessons</h2>
             <button
               onClick={createLesson}
-              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg font-medium transition-colors"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
             >
-              Create Lesson
+              + New Lesson
             </button>
           </div>
 
           {lessons.length === 0 ? (
-            <p className="text-gray-400">No lessons yet. Create one to get started.</p>
+            <div className="text-center py-16">
+              <p className="text-gray-500 mb-4">No lessons yet.</p>
+              <button
+                onClick={createLesson}
+                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors"
+              >
+                Create your first lesson
+              </button>
+            </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {lessons.map(lesson => (
-                <div key={lesson.id} className="bg-gray-800 rounded-xl p-4 border border-gray-700">
-                  <h3 className="font-semibold text-lg mb-1">{lesson.title}</h3>
-                  <p className="text-gray-400 text-sm mb-3">
-                    {lesson.checkpoint_count || 0} questions | {lesson.timer_seconds}s timer
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => navigate(`/instructor/lessons/${lesson.id}`)}
-                      className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-sm"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => createSession(lesson.id)}
-                      className="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-sm"
-                    >
-                      Start Session
-                    </button>
+            <div className="space-y-3">
+              {lessons.map((lesson) => {
+                const count = sessionCountFor(lesson.id);
+                return (
+                  <div
+                    key={lesson.id}
+                    className="bg-gray-800 rounded-xl p-4 border border-gray-700 cursor-pointer hover:border-gray-500 transition-colors"
+                    onClick={() => navigate(`/instructor/lessons/${lesson.id}`)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="font-semibold text-base">{lesson.title}</h3>
+                        <p className="text-gray-500 text-sm mt-0.5">
+                          {lesson.checkpoint_count || 0} questions
+                          <span className="mx-1.5 text-gray-700">/</span>
+                          {lesson.timer_seconds}s timer
+                          {count > 0 && (
+                            <>
+                              <span className="mx-1.5 text-gray-700">/</span>
+                              {count} session{count !== 1 ? 's' : ''} run
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      <span className="text-gray-600 text-sm">&rarr;</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
-        </section>
-
-        <section>
-          <h2 className="text-xl font-semibold mb-4">Past Sessions</h2>
-          {sessions.length === 0 ? (
-            <p className="text-gray-400">No sessions yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {sessions.map(s => (
-                <div
-                  key={s.id}
-                  className="bg-gray-800 rounded-lg p-4 flex justify-between items-center border border-gray-700 cursor-pointer hover:border-gray-500"
-                  onClick={() => navigate(`/instructor/sessions/${s.id}/results`)}
-                >
-                  <div>
-                    <p className="font-medium">Code: {s.join_code}</p>
-                    <p className="text-gray-400 text-sm">
-                      {new Date(s.created_at).toLocaleDateString()} | Status: {s.status}
-                    </p>
-                  </div>
-                  <span className={`px-2 py-1 rounded text-xs ${
-                    s.status === 'ended' ? 'bg-gray-600' : 'bg-green-600'
-                  }`}>
-                    {s.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+        </div>
       </main>
     </div>
   );
