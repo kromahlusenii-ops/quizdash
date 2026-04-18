@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getToken, getAuthHeaders, signOut } from '../lib/supabase';
+import { getOnboardingStep, initOnboarding, advanceOnboarding, completeOnboarding } from '../lib/onboarding';
+import OnboardingTooltip from '../components/OnboardingTooltip';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -94,6 +96,25 @@ export default function Dashboard() {
     navigate('/instructor/login');
   }
 
+  // Onboarding
+  const [onboardingStep, setOnboardingStep] = useState<number | null>(null);
+  useEffect(() => {
+    if (!loading && lessons.length === 0) {
+      initOnboarding();
+    }
+    setOnboardingStep(getOnboardingStep());
+  }, [loading, lessons.length]);
+
+  const handleAdvance = useCallback(() => {
+    advanceOnboarding();
+    setOnboardingStep(getOnboardingStep());
+  }, []);
+
+  const handleSkip = useCallback(() => {
+    completeOnboarding();
+    setOnboardingStep(null);
+  }, []);
+
   const activeSession = sessions.find(
     (s) => s.status === 'lobby' || s.status === 'running'
   );
@@ -160,14 +181,24 @@ export default function Dashboard() {
           </div>
 
           {lessons.length === 0 ? (
-            <div className="text-center py-16 border border-line rounded-xl">
+            <div className="text-center py-16 border border-line rounded-xl flex flex-col items-center">
               <p className="text-dim mb-4 text-sm">No lessons yet.</p>
-              <button
-                onClick={createLesson}
-                className="px-6 py-3 bg-accent hover:bg-accent-hover rounded-lg font-medium transition-colors text-sm"
+              <OnboardingTooltip
+                step={1}
+                currentStep={onboardingStep}
+                position="bottom"
+                message="Start here — create a lesson with quiz questions"
+                cta="Let's go"
+                onAdvance={() => { handleAdvance(); createLesson(); }}
+                onSkip={handleSkip}
               >
-                Create your first lesson
-              </button>
+                <button
+                  onClick={createLesson}
+                  className="px-6 py-3 bg-accent hover:bg-accent-hover rounded-lg font-medium transition-colors text-sm"
+                >
+                  Create your first lesson
+                </button>
+              </OnboardingTooltip>
             </div>
           ) : (
             <div className="space-y-2">

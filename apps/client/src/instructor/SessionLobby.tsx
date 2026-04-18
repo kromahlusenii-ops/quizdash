@@ -1,7 +1,9 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getAuthHeaders } from '../lib/supabase';
 import { useSessionPolling } from '../ws/useSessionPolling';
+import { getOnboardingStep, completeOnboarding } from '../lib/onboarding';
+import OnboardingTooltip from '../components/OnboardingTooltip';
 import QRCode from 'qrcode';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -15,6 +17,8 @@ export default function SessionLobby() {
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const initialized = useRef(false);
+  const [obStep, setObStep] = useState<number | null>(getOnboardingStep());
+  const obDone = useCallback(() => { completeOnboarding(); setObStep(null); }, []);
 
   useEffect(() => {
     if (initialized.current) return;
@@ -64,13 +68,23 @@ export default function SessionLobby() {
         <div className="grid md:grid-cols-2 gap-8">
           <div className="text-center">
             <p className="text-dim text-xs mb-2">JOIN CODE</p>
-            <div
-              className="text-5xl font-mono font-bold tracking-[0.3em] bg-surface border border-accent-blue rounded-xl py-6 cursor-pointer hover:border-accent-hover transition-colors shadow-[0_0_30px_rgba(33,33,222,0.15)]"
-              onClick={() => navigator.clipboard.writeText(joinCode)}
-              title="Click to copy"
+            <OnboardingTooltip
+              step={5}
+              currentStep={obStep}
+              position="bottom"
+              message="Share this code with students. They join at quizdash.vercel.app/join. Launch when ready!"
+              cta="Done"
+              onAdvance={obDone}
+              onSkip={obDone}
             >
-              {joinCode}
-            </div>
+              <div
+                className="text-5xl font-mono font-bold tracking-[0.3em] bg-surface border border-accent-blue rounded-xl py-6 cursor-pointer hover:border-accent-hover transition-colors shadow-[0_0_30px_rgba(33,33,222,0.15)]"
+                onClick={() => navigator.clipboard.writeText(joinCode)}
+                title="Click to copy"
+              >
+                {joinCode}
+              </div>
+            </OnboardingTooltip>
             <p className="text-dim text-xs mt-2">Click to copy</p>
 
             {qrDataUrl && (

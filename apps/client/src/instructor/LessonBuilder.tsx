@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getAuthHeaders } from '../lib/supabase';
+import { getOnboardingStep, advanceOnboarding, setOnboardingStep, completeOnboarding } from '../lib/onboarding';
+import OnboardingTooltip from '../components/OnboardingTooltip';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -33,6 +35,27 @@ export default function LessonBuilder() {
   const [error, setError] = useState('');
   const [sessions, setSessions] = useState<Session[]>([]);
   const [launching, setLaunching] = useState(false);
+
+  // Onboarding
+  const [obStep, setObStep] = useState<number | null>(getOnboardingStep());
+  const obAdvance = useCallback(() => { advanceOnboarding(); setObStep(getOnboardingStep()); }, []);
+  const obSkip = useCallback(() => { completeOnboarding(); setObStep(null); }, []);
+
+  // Auto-advance step 2→3 when title is edited
+  useEffect(() => {
+    if (obStep === 2 && title && title !== 'New Lesson') {
+      setOnboardingStep(3);
+      setObStep(3);
+    }
+  }, [title, obStep]);
+
+  // Auto-advance step 3→4 when first question is added
+  useEffect(() => {
+    if (obStep === 3 && checkpoints.length > 0) {
+      setOnboardingStep(4);
+      setObStep(4);
+    }
+  }, [checkpoints.length, obStep]);
 
   const headers = useCallback(() => ({
     'Content-Type': 'application/json',
@@ -168,13 +191,23 @@ export default function LessonBuilder() {
           >
             {saving ? 'Saving...' : saved ? 'Saved!' : 'Save'}
           </button>
-          <button
-            onClick={launchSession}
-            disabled={!allValid || launching}
-            className="px-4 py-2 bg-accent hover:bg-accent-hover disabled:bg-surface disabled:text-dim rounded-lg text-xs font-medium transition-colors shadow-[0_0_15px_rgba(33,33,222,0.2)]"
+          <OnboardingTooltip
+            step={4}
+            currentStep={obStep}
+            position="bottom"
+            message="Once all questions are valid, launch a live session"
+            cta="Got it"
+            onAdvance={obAdvance}
+            onSkip={obSkip}
           >
-            {launching ? 'Launching...' : 'Launch Session'}
-          </button>
+            <button
+              onClick={launchSession}
+              disabled={!allValid || launching}
+              className="px-4 py-2 bg-accent hover:bg-accent-hover disabled:bg-surface disabled:text-dim rounded-lg text-xs font-medium transition-colors shadow-[0_0_15px_rgba(33,33,222,0.2)]"
+            >
+              {launching ? 'Launching...' : 'Launch Session'}
+            </button>
+          </OnboardingTooltip>
         </div>
       </header>
 
@@ -187,14 +220,24 @@ export default function LessonBuilder() {
 
         {/* Settings */}
         <div className="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-dim text-xs mb-1">Lesson Title</label>
-            <input
-              type="text" value={title}
-              onChange={(e) => setTitle(e.target.value)} onBlur={saveLesson}
-              className="w-full px-4 py-3 rounded-lg bg-surface border border-line text-white focus:outline-none focus:border-accent transition-colors"
-            />
-          </div>
+          <OnboardingTooltip
+            step={2}
+            currentStep={obStep}
+            position="bottom"
+            message="Name your lesson, then add questions below"
+            cta="Next"
+            onAdvance={obAdvance}
+            onSkip={obSkip}
+          >
+            <div>
+              <label className="block text-dim text-xs mb-1">Lesson Title</label>
+              <input
+                type="text" value={title}
+                onChange={(e) => setTitle(e.target.value)} onBlur={saveLesson}
+                className="w-full px-4 py-3 rounded-lg bg-surface border border-line text-white focus:outline-none focus:border-accent transition-colors"
+              />
+            </div>
+          </OnboardingTooltip>
           <div>
             <label className="block text-dim text-xs mb-1">Timer per question</label>
             <select
@@ -287,12 +330,22 @@ export default function LessonBuilder() {
             </div>
           ))}
 
-          <button
-            onClick={addCheckpoint}
-            className="w-full py-3 border-2 border-dashed border-line rounded-xl text-dim hover:text-accent hover:border-accent/30 transition-colors text-xs"
+          <OnboardingTooltip
+            step={3}
+            currentStep={obStep}
+            position="bottom"
+            message="Add at least one question with 4 options. Click a letter to mark the correct answer."
+            cta="Add one"
+            onAdvance={() => { obAdvance(); addCheckpoint(); }}
+            onSkip={obSkip}
           >
-            + Add Question
-          </button>
+            <button
+              onClick={addCheckpoint}
+              className="w-full py-3 border-2 border-dashed border-line rounded-xl text-dim hover:text-accent hover:border-accent/30 transition-colors text-xs"
+            >
+              + Add Question
+            </button>
+          </OnboardingTooltip>
 
           {!allValid && checkpoints.length > 0 && (
             <p className="text-gold/80 text-xs">
