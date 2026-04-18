@@ -1,5 +1,5 @@
 {
-  "name": "financegame",
+  "name": "quizdash",
   "private": true,
   "workspaces": [
     "packages/*",
@@ -16,5 +16,8 @@
     "turbo": "^2.0.0",
     "typescript": "~5.4.0"
   },
-  "packageManager": "npm@10.2.0"
+  "packageManager": "npm@10.2.0",
+  "dependencies": {
+    "@vercel/og": "^0.11.1"
+  }
 }

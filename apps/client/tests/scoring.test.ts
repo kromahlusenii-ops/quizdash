@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculatePoints, sortLeaderboard } from '@financegame/shared';
+import { calculatePoints, sortLeaderboard } from '@quizdash/shared';
 
 describe('Client-side scoring (re-exports from shared)', () => {
   it('calculates correct points for a correct answer', () => {

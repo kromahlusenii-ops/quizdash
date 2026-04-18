@@ -1,5 +1,5 @@
 {
-  "name": "@financegame/client",
+  "name": "@quizdash/client",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@financegame/shared": "*",
+    "@quizdash/shared": "*",
     "@supabase/supabase-js": "^2.101.1",
     "qrcode": "^1.5.3",
     "react": "^18.2.0",
